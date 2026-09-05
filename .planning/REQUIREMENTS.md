@@ -72,14 +72,14 @@ Deferred to a future release. Tracked but not in this milestone's roadmap.
 | SESSION-02 | Phase 2 | Pending |
 | SESSION-03 | Phase 2 | Pending |
 | SESSION-04 | Phase 2 | Pending |
-| BUILD-01 | Phase 3 | Pending |
-| BUILD-02 | Phase 3 | Pending |
-| QA-01 | Phase 4 | Pending |
-| QA-02 | Phase 4 | Pending |
-| TEST-01 | Phase 5 | Pending |
-| TEST-02 | Phase 5 | Pending |
-| TEST-03 | Phase 5 | Pending |
-| TEST-04 | Phase 5 | Pending |
+| BUILD-01 | Phase 2 | Pending |
+| BUILD-02 | Phase 2 | Pending |
+| QA-01 | Phase 3 | Pending |
+| QA-02 | Phase 3 | Pending |
+| TEST-01 | Phase 4 | Pending |
+| TEST-02 | Phase 4 | Pending |
+| TEST-03 | Phase 4 | Pending |
+| TEST-04 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 16 total
@@ -88,4 +88,4 @@ Deferred to a future release. Tracked but not in this milestone's roadmap.
 
 ---
 *Requirements defined: 2026-09-05*
-*Last updated: 2026-09-05 after initial definition*
+*Last updated: 2026-09-05 after roadmap creation (phase count finalized at 4: BUILD-01/02 folded into Phase 2 with Session Continuity as one core-value slice; QA and Testing renumbered to Phase 3 and Phase 4)*
