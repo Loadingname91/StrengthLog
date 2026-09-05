@@ -58,6 +58,10 @@ Performed a systematic code-reading audit of every interactive control (button, 
 
 Home's goal cards and Add Goal sheet; StatsHub's tab switching and all 4 tabs (Overview's range toggle, Muscles' heatmap-tap filtering, Log's session/entry expansion, the Measurements tab-link special-case route); ActiveWorkout's rest timer adjust/skip, set add/remove (guarded against going below 1 set), RIR chip selection, exercise-chip navigation, and finish-with-incomplete-sets confirmation; CsvImport's full 5-step wizard; ExportInsights' CSV/PDF export and date-range filtering; ExerciseDetail's metric toggle and notes-on-blur autosave; WorkoutSummary's note-and-done flow; ExerciseLibrary's search/filter/create-custom flow; WeekStrip's week pagination and day-tap navigation; BodyHeatmap's region-tap filtering; SegmentedControl and ProgressBar (no interactive surface beyond their own onChange, already correct).
 
+## Self-Review Catch (Post-Fix Consistency Check)
+
+While reviewing the two new action-menu backdrops (#1 and #2 above) for consistency with the Phase 1 WR-04 modal-stack fix, found that neither backdrop was registered with `src/lib/modalStack.js` — meaning Android hardware back would navigate away instead of dismissing an open menu, the same class of gap WR-04 fixed for `ConfirmSheet`, now reachable through a different overlay. Extended both `Routines.jsx` (`menuFor`) and `RoutineBuilder.jsx` (`blockMenuFor`) to push/pop through the same shared modal stack, so Android back now dismisses either menu correctly.
+
 ## Deferred (Not Fixed — Recorded Per QA-02)
 
 RoutineBuilder's drag-to-reorder gesture has no `visibilitychange`/`blur` interrupt safeguard (same category as Phase 1's CR-01, but lower severity — reordering is non-destructive and reversible, and `onPointerCancel` already covers the common interruption path). Recorded in `PROJECT.md`'s Context section with explicit reasoning rather than silently dropped.
