@@ -36,10 +36,36 @@ Requirements for this stabilization milestone. Each maps to a roadmap phase.
 
 ### Testing
 
-- [ ] **TEST-01**: A test framework (Vitest + Testing Library, per `.planning/codebase/TESTING.md`) is installed and configured
-- [ ] **TEST-02**: `src/state/reducer.js` has unit test coverage for the actions touched by this milestone (seed removal path, `DELETE_ALL_DATA`, workout start/finish/session transitions)
-- [ ] **TEST-03**: The new interactive features from this milestone (delete long-press, target-weight field, persistent session bar) have at least smoke-level interaction tests
-- [ ] **TEST-04**: `npm run lint` and the new test command both run clean as part of "done" for this milestone
+- [x] **TEST-01**: A test framework (Vitest + Testing Library, per `.planning/codebase/TESTING.md`) is installed and configured
+- [x] **TEST-02**: `src/state/reducer.js` has unit test coverage for the actions touched by this milestone (seed removal path, `DELETE_ALL_DATA`, workout start/finish/session transitions)
+- [x] **TEST-03**: The new interactive features from this milestone (delete long-press, target-weight field, persistent session bar) have at least smoke-level interaction tests
+- [x] **TEST-04**: `npm run lint` and the new test command both run clean as part of "done" for this milestone
+
+## v1.1 Requirements
+
+Requirements for the "Smart Set Flow" milestone — faster on-phone set entry, and
+structured rest/superset authoring that matches how the workout actually flows.
+Each maps to a v1.1 roadmap phase.
+
+### Fast Set Entry
+
+- [x] **ENTRY-01**: Active Workout's weight/reps inputs are sized for comfortable one-handed phone entry (larger tap target and font than today's compact row)
+- [x] **ENTRY-02**: Confirming a value in the weight field advances focus to that set's reps field; confirming reps advances focus to the next set's weight field (or blurs, on the last set) — no manual re-tapping between fields
+- [x] **ENTRY-03**: A set is automatically marked done once both its weight and reps hold valid values — the checkmark becomes a manual override/undo, not the only way to complete a set
+
+### Structured Rest Sets
+
+- [x] **REST-01**: Routine Builder lets the user add and remove explicit rest rows within a block's set sequence, interleaved with sets rather than a single implicit per-block duration
+- [x] **REST-02**: Each rest row's duration is independently editable
+- [x] **REST-03**: A newly added rest row defaults its duration to Settings' "Default rest (sec)" value
+- [x] **REST-04**: Existing routines saved before this milestone (a `sets` count + one `rest` value, no explicit sequence) load and behave exactly as before — backfilled into the new model with no data loss and no behavior change until edited
+- [x] **REST-05**: Active Workout displays rest as an explicit row in the set list (not only the existing bottom sticky timer), reflecting the routine's authored sequence
+
+### Superset Merge & Flow
+
+- [x] **SUPER-01**: Routine Builder's exercise multi-select can merge 2+ single-exercise blocks into a superset whose sets interleave — exercise A's set, then B's, then A's, then B's — with rest inserted only after each full round (every exercise in the pair has done one set), not after every individual set
+- [x] **SUPER-02**: Active Workout auto-advances to the next exercise in a superset round immediately after a set is marked done — no manual tab-switching required to follow the intended alternating flow
+- [x] **SUPER-03**: Active Workout renders a merged superset as one interleaved flow (both exercises' current position visible together) rather than two independent per-exercise tabs
 
 ## v2 Requirements
 
@@ -76,17 +102,29 @@ Deferred to a future release. Tracked but not in this milestone's roadmap.
 | BUILD-02 | Phase 2 | Complete |
 | QA-01 | Phase 3 | Complete |
 | QA-02 | Phase 3 | Complete |
-| TEST-01 | Phase 4 | Pending |
-| TEST-02 | Phase 4 | Pending |
-| TEST-03 | Phase 4 | Pending |
-| TEST-04 | Phase 4 | Pending |
+| TEST-01 | Phase 4 | Complete |
+| TEST-02 | Phase 4 | Complete |
+| TEST-03 | Phase 4 | Complete |
+| TEST-04 | Phase 4 | Complete |
+| ENTRY-01 | Phase 5 | Complete |
+| ENTRY-02 | Phase 5 | Complete |
+| ENTRY-03 | Phase 5 | Complete |
+| REST-01 | Phase 6 | Complete |
+| REST-02 | Phase 6 | Complete |
+| REST-03 | Phase 6 | Complete |
+| REST-04 | Phase 6 | Complete |
+| REST-05 | Phase 6 | Complete |
+| SUPER-01 | Phase 6 | Complete |
+| SUPER-02 | Phase 6 | Complete |
+| SUPER-03 | Phase 6 | Complete |
 
 **Coverage:**
 
-- v1 requirements: 16 total
-- Mapped to phases: 16
+- v1 requirements: 16 total, all complete
+- v1.1 requirements: 11 total, all complete
+- Mapped to phases: 27
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-05*
-*Last updated: 2026-09-05 after roadmap creation (phase count finalized at 4: BUILD-01/02 folded into Phase 2 with Session Continuity as one core-value slice; QA and Testing renumbered to Phase 3 and Phase 4)*
+*Last updated: 2026-09-05 — v1.1 "Smart Set Flow" shipped: all 11 requirements (ENTRY-01..03, REST-01..05, SUPER-01..03) complete across Phases 5-6. Both v1.0 and v1.1 milestones now fully closed (27/27 requirements).*

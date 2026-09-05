@@ -1,30 +1,52 @@
 import { EXERCISES } from '../lib/exercises'
 import { blockTarget, todayISO, localISODate } from '../lib/format'
 import { bestProductForExercise, totalVolume } from '../lib/selectors'
+import { backfillSequence } from '../lib/blocks'
 import { uid } from '../lib/id'
 
 export function initialSettings() {
   return { units: 'kg', theme: 'system', restDefault: 90, showRIR: true }
 }
 
-function buildActiveWorkoutFromRoutine(routine, sessions) {
-  const exercises = []
-  routine.blocks.forEach((block) => {
-    block.exerciseIds.forEach((exerciseId, pairIndex) => {
-      exercises.push({
-        exerciseId,
-        blockId: block.id,
-        blockType: block.type,
-        pairIndex,
-        pairSize: block.exerciseIds.length,
-        target: blockTarget(block),
-        rest: block.rest,
-        rir: block.rir,
-        targetWeight: block.targetWeight ?? null,
-        sets: Array.from({ length: block.sets }, () => ({ weight: '', reps: '', rir: null, done: false, isPR: false })),
-      })
-    })
-  })
+// Expands one routine block into a runtime unit. A superset block produces
+// ONE merged unit (not one per exercise) whose flat `sets` array interleaves
+// every exercise's sets in round order, each tagged with `exerciseIndex` —
+// this is what lets a single confirm-to-advance focus chain (see
+// ActiveWorkout.jsx's SetRow) cross from one exercise's set straight into
+// the paired exercise's, with no separate navigation state needed.
+// `restAfter` is a parallel array: restAfter[i] holds the rest duration to
+// start once sets[i] is completed, generalizing what pairIndex/pairSize used
+// to special-case for supersets only into one mechanism for every block.
+function expandUnit(block) {
+  const b = backfillSequence(block)
+  const isSuperset = b.type === 'superset'
+  const n = isSuperset ? b.exerciseIds.length : 1
+  const sets = []
+  const restAfter = []
+  for (const step of b.sequence) {
+    if (step.type === 'rest') {
+      if (sets.length > 0) restAfter[sets.length - 1] = step.seconds
+      continue
+    }
+    for (let k = 0; k < n; k++) {
+      sets.push({ weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: k })
+      restAfter.push(null)
+    }
+  }
+  return {
+    blockId: b.id,
+    blockType: b.type,
+    exerciseIds: b.exerciseIds,
+    exerciseId: isSuperset ? undefined : b.exerciseIds[0],
+    target: blockTarget(b),
+    rir: b.rir,
+    targetWeight: b.targetWeight ?? null,
+    sets,
+    restAfter,
+  }
+}
+
+function buildActiveWorkoutFromRoutine(routine) {
   return {
     id: uid('workout'),
     routineId: routine.id,
@@ -33,14 +55,9 @@ function buildActiveWorkoutFromRoutine(routine, sessions) {
     currentIndex: 0,
     restUntil: null,
     restExerciseIndex: null,
-    exercises,
+    restTotalSec: null,
+    exercises: routine.blocks.map(expandUnit),
   }
-}
-
-function isLastInPair(aw, index) {
-  const ex = aw.exercises[index]
-  if (ex.blockType !== 'superset') return true
-  return ex.pairIndex === ex.pairSize - 1
 }
 
 export function reducer(state, action) {
@@ -116,7 +133,7 @@ export function reducer(state, action) {
       if (state.activeWorkout) return state
       const routine = state.routines.find((r) => r.id === action.payload.routineId)
       if (!routine) return state
-      return { ...state, activeWorkout: buildActiveWorkoutFromRoutine(routine, state.sessions) }
+      return { ...state, activeWorkout: buildActiveWorkoutFromRoutine(routine) }
     }
 
     case 'DISCARD_WORKOUT':
@@ -135,19 +152,26 @@ export function reducer(state, action) {
 
     case 'ADD_SET': {
       if (!state.activeWorkout) return state
-      const exercises = state.activeWorkout.exercises.map((ex, i) =>
-        i === action.payload.exerciseIndex
-          ? { ...ex, sets: [...ex.sets, { weight: '', reps: '', rir: null, done: false, isPR: false }] }
-          : ex
-      )
+      const exercises = state.activeWorkout.exercises.map((ex, i) => {
+        if (i !== action.payload.exerciseIndex) return ex
+        // A superset round always adds/removes one set per exercise in the
+        // pair together, keeping the exerciseIndex alternation (and the
+        // round-grouping this feeds in ActiveWorkout's UI) intact.
+        const n = ex.blockType === 'superset' ? ex.exerciseIds.length : 1
+        const newSets = Array.from({ length: n }, (_, k) => ({ weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: k }))
+        return { ...ex, sets: [...ex.sets, ...newSets], restAfter: [...ex.restAfter, ...Array(n).fill(null)] }
+      })
       return { ...state, activeWorkout: { ...state.activeWorkout, exercises } }
     }
 
     case 'REMOVE_SET': {
       if (!state.activeWorkout) return state
-      const exercises = state.activeWorkout.exercises.map((ex, i) =>
-        i === action.payload.exerciseIndex && ex.sets.length > 1 ? { ...ex, sets: ex.sets.slice(0, -1) } : ex
-      )
+      const exercises = state.activeWorkout.exercises.map((ex, i) => {
+        if (i !== action.payload.exerciseIndex) return ex
+        const n = ex.blockType === 'superset' ? ex.exerciseIds.length : 1
+        if (ex.sets.length <= n) return ex
+        return { ...ex, sets: ex.sets.slice(0, -n), restAfter: ex.restAfter.slice(0, -n) }
+      })
       return { ...state, activeWorkout: { ...state.activeWorkout, exercises } }
     }
 
@@ -164,7 +188,8 @@ export function reducer(state, action) {
         const weight = parseFloat(set.weight)
         const reps = parseInt(set.reps, 10)
         if (Number.isFinite(weight) && Number.isFinite(reps) && weight > 0 && reps > 0) {
-          const priorBest = bestProductForExercise(state.sessions, ex.exerciseId)
+          const exerciseId = ex.blockType === 'superset' ? ex.exerciseIds[set.exerciseIndex] : ex.exerciseId
+          const priorBest = bestProductForExercise(state.sessions, exerciseId)
           isPR = weight * reps > priorBest
         }
       }
@@ -177,12 +202,15 @@ export function reducer(state, action) {
 
       let restUntil = aw.restUntil
       let restExerciseIndex = aw.restExerciseIndex
-      if (willBeDone && isLastInPair(aw, exerciseIndex)) {
-        restUntil = new Date(Date.now() + ex.rest * 1000).toISOString()
+      let restTotalSec = aw.restTotalSec
+      const restSeconds = ex.restAfter[setIndex]
+      if (willBeDone && restSeconds != null) {
+        restUntil = new Date(Date.now() + restSeconds * 1000).toISOString()
         restExerciseIndex = exerciseIndex
+        restTotalSec = restSeconds
       }
 
-      return { ...state, activeWorkout: { ...aw, exercises, restUntil, restExerciseIndex, lastPR: isPR ? { exerciseIndex, setIndex } : aw.lastPR } }
+      return { ...state, activeWorkout: { ...aw, exercises, restUntil, restExerciseIndex, restTotalSec, lastPR: isPR ? { exerciseIndex, setIndex } : aw.lastPR } }
     }
 
     case 'GOTO_EXERCISE':
@@ -203,13 +231,19 @@ export function reducer(state, action) {
       const aw = state.activeWorkout
       if (!aw) return state
       const entries = aw.exercises
-        .map((ex) => ({
-          exerciseId: ex.exerciseId,
-          blockId: ex.blockId,
-          sets: ex.sets
-            .filter((s) => s.done && s.weight !== '' && s.reps !== '')
-            .map((s) => ({ weight: parseFloat(s.weight) || 0, reps: parseInt(s.reps, 10) || 0, rir: s.rir, isPR: !!s.isPR })),
-        }))
+        .flatMap((ex) => {
+          // A single-exercise unit's sets all carry exerciseIndex 0 — this
+          // uniformly produces one entry for it, and one entry per exercise
+          // for a merged superset unit, without a separate code path.
+          const exerciseIds = ex.blockType === 'superset' ? ex.exerciseIds : [ex.exerciseId]
+          return exerciseIds.map((exerciseId, idx) => ({
+            exerciseId,
+            blockId: ex.blockId,
+            sets: ex.sets
+              .filter((s) => s.exerciseIndex === idx && s.done && s.weight !== '' && s.reps !== '')
+              .map((s) => ({ weight: parseFloat(s.weight) || 0, reps: parseInt(s.reps, 10) || 0, rir: s.rir, isPR: !!s.isPR })),
+          }))
+        })
         .filter((e) => e.sets.length)
 
       const finishedAt = new Date().toISOString()

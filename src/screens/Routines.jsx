@@ -10,9 +10,19 @@ import { exerciseById } from '../lib/exercises'
 import { uid } from '../lib/id'
 import { weekdayName } from '../lib/schedule'
 import { pushModal, popModal } from '../lib/modalStack'
+import { backfillSequence } from '../lib/blocks'
 
+// 50s of work assumed per set; a round (superset) costs 50s per exercise in
+// the pair, matching how set/rep totals elsewhere already scale by
+// exerciseIds.length for a superset. Rest steps contribute their real duration.
 function estimateDuration(routine) {
-  const seconds = routine.blocks.reduce((sum, b) => sum + b.sets * (50 + b.rest), 0)
+  const seconds = routine.blocks.reduce((sum, block) => {
+    const b = backfillSequence(block)
+    return sum + b.sequence.reduce((s, step) => {
+      if (step.type === 'rest') return s + step.seconds
+      return s + 50 * (b.type === 'superset' ? b.exerciseIds.length : 1)
+    }, 0)
+  }, 0)
   return Math.round(seconds / 60)
 }
 

@@ -7,9 +7,19 @@ import { BackIcon, ShareIcon, ClockIcon } from '../components/Icons'
 import { exerciseById } from '../lib/exercises'
 import { blockTarget } from '../lib/format'
 import { topSetSparklinePoints } from '../lib/selectors'
+import { backfillSequence, sequenceSetCount } from '../lib/blocks'
 
+// 50s of work assumed per set; a round (superset) costs 50s per exercise in
+// the pair, matching how totalSets/totalReps below already scale by
+// exerciseIds.length for a superset. Rest steps contribute their real duration.
 function estimateDuration(routine) {
-  const seconds = routine.blocks.reduce((sum, b) => sum + b.sets * (50 + b.rest), 0)
+  const seconds = routine.blocks.reduce((sum, block) => {
+    const b = backfillSequence(block)
+    return sum + b.sequence.reduce((s, step) => {
+      if (step.type === 'rest') return s + step.seconds
+      return s + 50 * (b.type === 'superset' ? b.exerciseIds.length : 1)
+    }, 0)
+  }, 0)
   return Math.round(seconds / 60)
 }
 
@@ -39,8 +49,8 @@ export default function WorkoutOverview() {
 
   if (!routine) return null
 
-  const totalSets = routine.blocks.reduce((s, b) => s + b.sets * b.exerciseIds.length, 0)
-  const totalReps = routine.blocks.reduce((s, b) => s + b.sets * Math.round((b.repMin + b.repMax) / 2) * b.exerciseIds.length, 0)
+  const totalSets = routine.blocks.reduce((s, b) => s + sequenceSetCount(backfillSequence(b).sequence) * b.exerciseIds.length, 0)
+  const totalReps = routine.blocks.reduce((s, b) => s + sequenceSetCount(backfillSequence(b).sequence) * Math.round((b.repMin + b.repMax) / 2) * b.exerciseIds.length, 0)
   const exerciseCount = routine.blocks.reduce((s, b) => s + b.exerciseIds.length, 0)
 
   function start() {

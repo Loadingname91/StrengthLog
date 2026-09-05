@@ -2,11 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useStore } from '../state/StoreContext'
 import ExerciseLibraryPicker from './ExerciseLibrary'
-import { BackIcon, GripIcon } from '../components/Icons'
+import { BackIcon, GripIcon, ClockIcon } from '../components/Icons'
 import { exerciseById } from '../lib/exercises'
 import { blockTarget } from '../lib/format'
 import { uid } from '../lib/id'
 import { pushModal, popModal } from '../lib/modalStack'
+import { backfillSequence, sequenceSetCount, sequenceRestTotal } from '../lib/blocks'
 
 export default function RoutineBuilder() {
   const { id } = useParams()
@@ -36,6 +37,25 @@ export default function RoutineBuilder() {
     return () => popModal(handle)
   }, [blockMenuFor])
 
+  // Abort an in-progress drag if the app is backgrounded mid-gesture — no
+  // pointerup/pointercancel fires in that case, which would otherwise leave
+  // dragId/dragY stuck until the next unrelated pointer event (same class of
+  // interrupted-gesture bug as ConfirmSheet's hold-to-confirm CR-01 fix).
+  useEffect(() => {
+    function abortDrag() {
+      if (!dragInfo.current) return
+      dragInfo.current = null
+      setDragId(null)
+      setDragY(0)
+    }
+    document.addEventListener('visibilitychange', abortDrag)
+    window.addEventListener('blur', abortDrag)
+    return () => {
+      document.removeEventListener('visibilitychange', abortDrag)
+      window.removeEventListener('blur', abortDrag)
+    }
+  }, [])
+
   const checkedIndices = useMemo(() => [...checked].sort((a, b) => a - b), [checked])
   const canGroup = useMemo(() => {
     if (checkedIndices.length < 2) return false
@@ -54,10 +74,13 @@ export default function RoutineBuilder() {
 
   function groupSuperset() {
     const [first, ...rest] = checkedIndices
+    const firstBlock = backfillSequence(blocks[first])
+    const mergedSequence = firstBlock.sequence.map((step) => (step.type === 'set' ? { type: 'round' } : step))
     const merged = {
-      ...blocks[first],
+      ...firstBlock,
       type: 'superset',
       exerciseIds: checkedIndices.flatMap((i) => blocks[i].exerciseIds),
+      sequence: mergedSequence,
     }
     const next = blocks.filter((_, i) => !checkedIndices.includes(i))
     const insertAt = blocks.slice(0, first).filter((_, i) => !checkedIndices.includes(i)).length
@@ -69,7 +92,12 @@ export default function RoutineBuilder() {
 
   function ungroup(blockId) {
     setBlocks((prev) =>
-      prev.flatMap((b) => (b.id === blockId ? b.exerciseIds.map((exId) => ({ ...b, id: uid('block'), type: 'single', exerciseIds: [exId] })) : [b]))
+      prev.flatMap((b) => {
+        if (b.id !== blockId) return [b]
+        const bb = backfillSequence(b)
+        const singleSequence = bb.sequence.map((step) => (step.type === 'round' ? { type: 'set' } : step))
+        return b.exerciseIds.map((exId) => ({ ...bb, id: uid('block'), type: 'single', exerciseIds: [exId], sequence: singleSequence }))
+      })
     )
   }
 
@@ -125,7 +153,8 @@ export default function RoutineBuilder() {
 
   function addExercise(exerciseId) {
     setPickerOpen(false)
-    setEditingBlock({ id: uid('block'), type: 'single', exerciseIds: [exerciseId], sets: 3, repMin: 8, repMax: 12, rest: 90, rir: 2, targetWeight: null, isNew: true })
+    const seed = backfillSequence({ type: 'single', sets: 3, rest: state.settings.restDefault })
+    setEditingBlock({ id: uid('block'), type: 'single', exerciseIds: [exerciseId], sequence: seed.sequence, repMin: 8, repMax: 12, rir: 2, targetWeight: null, isNew: true })
   }
 
   function saveBlockEdit(patch) {
@@ -223,6 +252,7 @@ export default function RoutineBuilder() {
       {editingBlock && (
         <BlockEditSheet
           block={editingBlock}
+          restDefault={state.settings.restDefault}
           onCancel={() => setEditingBlock(null)}
           onSave={saveBlockEdit}
         />
@@ -273,7 +303,7 @@ function BlockRow({
       )}
       <div onClick={() => !selectMode && onEdit()} className="min-w-0 flex-1 cursor-pointer">
         <div className="text-sm font-semibold">{names}</div>
-        <div className="mt-0.5 text-[11.5px]" style={{ color: 'var(--muted)' }}>{blockTarget(block)} reps · {block.rest}s rest{block.rir != null ? ` · ${block.rir} RIR` : ''}</div>
+        <div className="mt-0.5 text-[11.5px]" style={{ color: 'var(--muted)' }}>{blockTarget(block)} reps · {sequenceRestTotal(backfillSequence(block).sequence)}s rest{block.rir != null ? ` · ${block.rir} RIR` : ''}</div>
       </div>
       {block.type === 'superset' && (
         <span className="rounded-md px-1.5 py-0.5 text-[10.5px] font-bold" style={{ color: 'var(--accent)', background: 'var(--accent-light)' }}>SUPERSET</span>
@@ -295,24 +325,97 @@ function BlockRow({
   )
 }
 
-export function BlockEditSheet({ block, onCancel, onSave }) {
-  const [sets, setSets] = useState(block.sets)
+export function BlockEditSheet({ block, restDefault, onCancel, onSave }) {
+  const [sequence, setSequence] = useState(() => backfillSequence(block).sequence)
   const [repMin, setRepMin] = useState(block.repMin)
   const [repMax, setRepMax] = useState(block.repMax)
-  const [rest, setRest] = useState(block.rest)
   const [rir, setRir] = useState(block.rir)
   const [targetWeight, setTargetWeight] = useState(block.targetWeight ?? '')
+
+  const stepLabel = block.type === 'superset' ? 'Round' : 'Set'
+  const stepType = block.type === 'superset' ? 'round' : 'set'
+
+  function addSetOrRound() {
+    setSequence((prev) => [...prev, { type: stepType }, { type: 'rest', seconds: restDefault }])
+  }
+
+  function removeStepAt(index) {
+    setSequence((prev) => {
+      const next = [...prev]
+      // Also remove the immediately-following rest step, if any, to avoid
+      // leaving an orphaned back-to-back rest with nothing to separate.
+      if (next[index].type !== 'rest' && next[index + 1]?.type === 'rest') next.splice(index, 2)
+      else next.splice(index, 1)
+      return next
+    })
+  }
+
+  function addRestAfter(index) {
+    setSequence((prev) => {
+      const next = [...prev]
+      next.splice(index + 1, 0, { type: 'rest', seconds: restDefault })
+      return next
+    })
+  }
+
+  function updateRestSeconds(index, seconds) {
+    setSequence((prev) => prev.map((s, i) => (i === index ? { ...s, seconds } : s)))
+  }
+
+  const onlyOneStepLeft = sequenceSetCount(sequence) === 1
+
+  let ordinal = 0
+  const rows = sequence.map((step, i) => {
+    if (step.type === 'rest') {
+      return (
+        <div key={i} className="flex items-center gap-2 rounded-lg border border-dashed p-2" style={{ borderColor: 'var(--border)', background: 'var(--surface-alt)' }}>
+          <ClockIcon size={14} style={{ color: 'var(--muted)' }} />
+          <input
+            type="number"
+            value={step.seconds}
+            onChange={(e) => updateRestSeconds(i, Number(e.target.value))}
+            className="w-20 rounded-lg border p-1.5 text-right text-sm"
+            style={{ borderColor: 'var(--border)' }}
+          />
+          <span className="text-xs" style={{ color: 'var(--muted)' }}>sec</span>
+          <button onClick={() => removeStepAt(i)} className="ml-auto text-lg" style={{ color: 'var(--danger)' }}>×</button>
+        </div>
+      )
+    }
+    ordinal++
+    const nextIsRest = sequence[i + 1]?.type === 'rest'
+    const isLastStep = i === sequence.length - 1
+    return (
+      <div key={i}>
+        <div className="flex items-center justify-between py-1">
+          <span className="text-sm font-semibold">{stepLabel} {ordinal}</span>
+          {!onlyOneStepLeft && <button onClick={() => removeStepAt(i)} className="text-lg" style={{ color: 'var(--danger)' }}>×</button>}
+        </div>
+        {!nextIsRest && !isLastStep && (
+          <button onClick={() => addRestAfter(i)} className="text-xs font-semibold" style={{ color: 'var(--accent-dark)' }}>+ Add rest</button>
+        )}
+      </div>
+    )
+  })
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onCancel}>
       <div className="fade-in mx-auto w-full max-w-[480px] rounded-t-[24px] p-5" style={{ background: 'var(--surface)' }} onClick={(e) => e.stopPropagation()}>
         <div className="font-serif text-lg font-semibold">{block.exerciseIds.map((id) => exerciseById(id)?.name || id).join(' + ')}</div>
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <Field label="Sets"><input type="number" value={sets} onChange={(e) => setSets(Number(e.target.value))} className="w-full rounded-xl border p-2 text-sm" style={{ borderColor: 'var(--border)' }} /></Field>
-          <Field label="Rest (sec)"><input type="number" value={rest} onChange={(e) => setRest(Number(e.target.value))} className="w-full rounded-xl border p-2 text-sm" style={{ borderColor: 'var(--border)' }} /></Field>
           <Field label="Min reps"><input type="number" value={repMin} onChange={(e) => setRepMin(Number(e.target.value))} className="w-full rounded-xl border p-2 text-sm" style={{ borderColor: 'var(--border)' }} /></Field>
           <Field label="Max reps"><input type="number" value={repMax} onChange={(e) => setRepMax(Number(e.target.value))} className="w-full rounded-xl border p-2 text-sm" style={{ borderColor: 'var(--border)' }} /></Field>
         </div>
+        <Field label="Sequence">
+          <div className="flex flex-col gap-1.5">{rows}</div>
+          <button
+            onClick={addSetOrRound}
+            className="mt-1.5 w-full rounded-xl border border-dashed p-2 text-xs font-semibold"
+            style={{ borderColor: 'var(--border)', color: 'var(--accent-dark)' }}
+          >
+            + Add Set
+          </button>
+        </Field>
         <Field label="RIR target (optional)">
           <input type="number" value={rir ?? ''} onChange={(e) => setRir(e.target.value === '' ? null : Number(e.target.value))} className="w-full rounded-xl border p-2 text-sm" style={{ borderColor: 'var(--border)' }} />
         </Field>
@@ -320,7 +423,7 @@ export function BlockEditSheet({ block, onCancel, onSave }) {
           <input type="number" value={targetWeight} onChange={(e) => setTargetWeight(e.target.value)} placeholder="e.g. 60" className="w-full rounded-xl border p-2 text-sm" style={{ borderColor: 'var(--border)' }} />
         </Field>
         <button
-          onClick={() => onSave({ sets, repMin, repMax, rest, rir, targetWeight: targetWeight === '' ? null : Number(targetWeight) })}
+          onClick={() => onSave({ repMin, repMax, rir, targetWeight: targetWeight === '' ? null : Number(targetWeight), sequence })}
           className="mt-2 w-full rounded-2xl py-3 text-sm font-semibold text-white"
           style={{ background: 'var(--accent)' }}
         >
