@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../state/StoreContext'
 import Card from '../components/Card'
+import ConfirmSheet from '../components/ConfirmSheet'
 import LineChart from '../components/LineChart'
 import { BackIcon, TrashIcon } from '../components/Icons'
 import { fmtDate, todayISO, daysAgo, localISODate } from '../lib/format'
@@ -18,6 +19,7 @@ export default function Measurements() {
   const { state, dispatch } = useStore()
   const navigate = useNavigate()
   const [form, setForm] = useState({ date: todayISO(), bodyweight: '', waist: '', chest: '', biceps: '', neck: '', notes: '' })
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   function submit() {
     const payload = { ...form }
@@ -93,13 +95,23 @@ export default function Measurements() {
               <span className="tabular-nums">
                 {METRICS.filter((m) => entry[m.key] != null).map((m) => `${m.label.split(' ')[0]} ${entry[m.key]}`).join(' · ')}
               </span>
-              <button onClick={() => dispatch({ type: 'DELETE_MEASUREMENT', payload: entry.id })} style={{ color: 'var(--muted)' }}>
+              <button onClick={() => setDeleteTarget(entry.id)} style={{ color: 'var(--muted)' }}>
                 <TrashIcon size={14} />
               </button>
             </div>
           ))}
         </div>
       </div>
+
+      <ConfirmSheet
+        open={!!deleteTarget}
+        title="Delete this entry?"
+        body="This measurement entry will be permanently removed."
+        confirmLabel="Delete"
+        danger
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => { dispatch({ type: 'DELETE_MEASUREMENT', payload: deleteTarget }); setDeleteTarget(null) }}
+      />
     </div>
   )
 }
