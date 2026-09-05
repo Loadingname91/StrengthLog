@@ -38,6 +38,14 @@ export default function ActiveWorkout() {
   }, [])
 
   useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === 'visible') setNow(Date.now())
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
+
+  useEffect(() => {
     if (!aw?.restUntil) { dingPlayed.current = false; return }
     const remaining = new Date(aw.restUntil).getTime() - now
     if (remaining <= 0 && !dingPlayed.current) {
