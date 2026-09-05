@@ -98,6 +98,8 @@ export default function Routines() {
               </Card>
 
               {menuFor === routine.id && (
+                <>
+                <div className="fixed inset-0 z-[5]" onClick={() => setMenuFor(null)} />
                 <div className="absolute right-3 top-14 z-10 flex flex-col overflow-hidden rounded-xl border shadow-lg" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
                   <button onClick={() => { navigate(`/routines/${routine.id}/edit`); setMenuFor(null) }} className="flex items-center gap-2 px-4 py-2.5 text-sm">
                     <EditIcon size={15} /> Edit
@@ -109,6 +111,7 @@ export default function Routines() {
                     <TrashIcon size={15} /> Delete
                   </button>
                 </div>
+                </>
               )}
             </div>
           )

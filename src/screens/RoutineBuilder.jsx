@@ -22,6 +22,7 @@ export default function RoutineBuilder() {
   const [editingBlock, setEditingBlock] = useState(null)
   const [dragId, setDragId] = useState(null)
   const [dragY, setDragY] = useState(0)
+  const [blockMenuFor, setBlockMenuFor] = useState(null)
   const rowRefs = useRef({})
   const dragInfo = useRef(null)
   const suppressClickRef = useRef(false)
@@ -184,6 +185,9 @@ export default function RoutineBuilder() {
             onEdit={() => { if (suppressClickRef.current) return; setEditingBlock(block) }}
             onUngroup={() => ungroup(block.id)}
             onRemove={() => removeBlock(block.id)}
+            menuOpen={blockMenuFor === block.id}
+            onToggleMenu={() => setBlockMenuFor(blockMenuFor === block.id ? null : block.id)}
+            onCloseMenu={() => setBlockMenuFor(null)}
           />
         ))}
 
@@ -222,9 +226,9 @@ function BlockRow({
   block, selectMode, checked, dragging, dragY,
   setRowRef, onGripPointerDown, onGripPointerMove, onGripPointerUp,
   onToggle, onEdit, onUngroup, onRemove,
+  menuOpen, onToggleMenu, onCloseMenu,
 }) {
   const names = block.exerciseIds.map((id) => exerciseById(id)?.name || id).join(' + ')
-  const [menuOpen, setMenuOpen] = useState(false)
   return (
     <div
       ref={setRowRef}
@@ -266,14 +270,17 @@ function BlockRow({
         <span className="rounded-md px-1.5 py-0.5 text-[10.5px] font-bold" style={{ color: 'var(--accent)', background: 'var(--accent-light)' }}>SUPERSET</span>
       )}
       {!selectMode && (
-        <button onClick={() => setMenuOpen(!menuOpen)} className="px-1 text-lg" style={{ color: 'var(--muted)' }}>⋮</button>
+        <button onClick={onToggleMenu} className="px-1 text-lg" style={{ color: 'var(--muted)' }}>⋮</button>
       )}
       {menuOpen && (
+        <>
+        <div className="fixed inset-0 z-[5]" onClick={onCloseMenu} />
         <div className="absolute right-2 top-11 z-10 flex flex-col overflow-hidden rounded-xl border shadow-lg" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-          <button onClick={() => { onEdit(); setMenuOpen(false) }} className="px-4 py-2 text-left text-sm">Edit</button>
-          {block.type === 'superset' && <button onClick={() => { onUngroup(); setMenuOpen(false) }} className="px-4 py-2 text-left text-sm">Ungroup</button>}
-          <button onClick={() => { onRemove(); setMenuOpen(false) }} className="px-4 py-2 text-left text-sm" style={{ color: 'var(--danger)' }}>Remove</button>
+          <button onClick={() => { onEdit(); onCloseMenu() }} className="px-4 py-2 text-left text-sm">Edit</button>
+          {block.type === 'superset' && <button onClick={() => { onUngroup(); onCloseMenu() }} className="px-4 py-2 text-left text-sm">Ungroup</button>}
+          <button onClick={() => { onRemove(); onCloseMenu() }} className="px-4 py-2 text-left text-sm" style={{ color: 'var(--danger)' }}>Remove</button>
         </div>
+        </>
       )}
     </div>
   )
