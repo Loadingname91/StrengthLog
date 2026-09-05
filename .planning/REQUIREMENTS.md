@@ -31,8 +31,8 @@ Requirements for this stabilization milestone. Each maps to a roadmap phase.
 
 ### Interaction Quality
 
-- [ ] **QA-01**: Every interactive control (button, toggle, gesture, drag handle) on every screen is manually exercised and confirmed to perform its stated action
-- [ ] **QA-02**: Every defect found during the audit is either fixed in this milestone or explicitly logged in PROJECT.md Context with a reason for deferring
+- [x] **QA-01**: Every interactive control (button, toggle, gesture, drag handle) on every screen is manually exercised and confirmed to perform its stated action
+- [x] **QA-02**: Every defect found during the audit is either fixed in this milestone or explicitly logged in PROJECT.md Context with a reason for deferring
 
 ### Testing
 
@@ -74,8 +74,8 @@ Deferred to a future release. Tracked but not in this milestone's roadmap.
 | SESSION-04 | Phase 2 | Complete |
 | BUILD-01 | Phase 2 | Complete |
 | BUILD-02 | Phase 2 | Complete |
-| QA-01 | Phase 3 | Pending |
-| QA-02 | Phase 3 | Pending |
+| QA-01 | Phase 3 | Complete |
+| QA-02 | Phase 3 | Complete |
 | TEST-01 | Phase 4 | Pending |
 | TEST-02 | Phase 4 | Pending |
 | TEST-03 | Phase 4 | Pending |

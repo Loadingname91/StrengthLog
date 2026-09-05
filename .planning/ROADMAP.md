@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Fresh Install & Safe Deletion** - New installs start completely empty and "Delete all data" requires a deliberate press-and-hold instead of a single tap (completed 2026-09-05)
 - [x] **Phase 2: Uninterrupted Workout Sessions** - Active workouts show correct placeholder guidance and survive navigation, backgrounding, and the hardware back button without losing the user's place (completed 2026-09-05)
-- [ ] **Phase 3: Interaction Quality Audit** - Every control on every screen is manually verified to do what it claims, with defects fixed or explicitly deferred
+- [x] **Phase 3: Interaction Quality Audit** - Every control on every screen is manually verified to do what it claims, with defects fixed or explicitly deferred (completed 2026-09-05)
 - [ ] **Phase 4: Test Suite & Regression Safety Net** - A Vitest + Testing Library suite covers this milestone's riskiest logic and newest features, running clean alongside lint
 
 ## Phase Details
@@ -71,7 +71,10 @@ Plans:
   1. Every button, toggle, gesture, and drag handle on every screen (Home, Routines, Routine Builder, Active Workout, Stats hub tabs, Measurements, CSV Import, Export & Insights, Settings) has been manually exercised at least once and confirmed to perform its stated action.
   2. Every defect discovered during the audit is either fixed within this milestone or recorded in PROJECT.md's Context section with an explicit, stated reason for deferring it.
 
-**Plans**: TBD
+**Plans**: 1/1 plans complete
+
+- [x] 03-01-PLAN.md
+
 **UI hint**: yes
 
 ### Phase 4: Test Suite & Regression Safety Net
@@ -98,5 +101,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Fresh Install & Safe Deletion | 2/2 | Complete    | 2026-09-05 |
 | 2. Uninterrupted Workout Sessions | 2/2 | Complete    | 2026-09-05 |
-| 3. Interaction Quality Audit | 0/TBD | Not started | - |
+| 3. Interaction Quality Audit | 1/1 | Complete    | 2026-09-05 |
 | 4. Test Suite & Regression Safety Net | 0/TBD | Not started | - |
