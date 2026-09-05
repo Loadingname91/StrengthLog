@@ -27,7 +27,7 @@ function estimateDuration(routine) {
 }
 
 export default function Routines() {
-  const { state, dispatch } = useStore()
+  const { state, dispatch, exercises } = useStore()
   const navigate = useNavigate()
   const [menuFor, setMenuFor] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -90,7 +90,7 @@ export default function Routines() {
       <div className="flex flex-col gap-3 px-5 pt-2">
         {ordered.map((routine, i) => {
           const exCount = routine.blocks.reduce((s, b) => s + b.exerciseIds.length, 0)
-          const heat = routine.blocks.flatMap((b) => b.exerciseIds).map((id) => exerciseById(id)).filter(Boolean)
+          const heat = routine.blocks.flatMap((b) => b.exerciseIds).map((id) => exerciseById(id, exercises)).filter(Boolean)
           return (
             <div key={routine.id} className="relative">
               <Card onClick={() => navigate(`/routines/${routine.id}`)} className="flex items-center gap-3">

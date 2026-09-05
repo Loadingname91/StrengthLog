@@ -16,11 +16,11 @@ export function sessionsInRange(sessions, fromDate, toDate) {
   return sessions.filter((s) => s.date >= from && s.date <= to)
 }
 
-export function muscleSetCounts(sessions) {
+export function muscleSetCounts(sessions, exercises) {
   const counts = {}
   for (const session of sessions) {
     for (const entry of session.entries) {
-      const ex = exerciseById(entry.exerciseId)
+      const ex = exerciseById(entry.exerciseId, exercises)
       if (!ex) continue
       counts[ex.primary] = (counts[ex.primary] || 0) + entry.sets.length
       if (ex.secondary) counts[ex.secondary] = (counts[ex.secondary] || 0) + entry.sets.length * 0.5
@@ -39,10 +39,10 @@ export function exerciseSetCounts(sessions) {
   return counts
 }
 
-export function goalProgress(goal, sessions) {
+export function goalProgress(goal, sessions, exercises) {
   if (goal.type === 'muscleSets') {
     const since = goal.period === 'week' ? startOfWeek() : startOfMonth()
-    const current = Math.round(muscleSetCounts(sessionsSince(sessions, since))[goal.muscle] || 0)
+    const current = Math.round(muscleSetCounts(sessionsSince(sessions, since), exercises)[goal.muscle] || 0)
     return {
       label: `${goal.target} sets for ${goal.muscle.toLowerCase()} this ${goal.period}`,
       current,

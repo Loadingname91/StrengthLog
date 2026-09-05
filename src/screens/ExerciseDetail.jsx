@@ -15,12 +15,12 @@ function epley1RM(weight, reps) {
 
 export default function ExerciseDetail() {
   const { id } = useParams()
-  const { state, dispatch } = useStore()
+  const { state, dispatch, exercises } = useStore()
   const navigate = useNavigate()
   const [metric, setMetric] = useState('weight')
   const [notes, setNotes] = useState(state.exerciseNotes[id] || '')
 
-  const ex = exerciseById(id)
+  const ex = exerciseById(id, exercises)
   const history = useMemo(() => exerciseHistory(state.sessions, id), [state.sessions, id])
   const prTable = useMemo(() => prByRepRange(state.sessions, id), [state.sessions, id])
 

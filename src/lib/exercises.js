@@ -29,8 +29,8 @@ export const EXERCISES = [
   { id: 'cable-crunch', name: 'Cable Crunch', aliases: [], primary: 'Core', secondary: null, equipment: 'Cable' },
 ]
 
-export function exerciseById(id) {
-  return EXERCISES.find((e) => e.id === id)
+export function exerciseById(id, list = EXERCISES) {
+  return list.find((e) => e.id === id)
 }
 
 export function searchExercises(list, query, muscle, equipment) {

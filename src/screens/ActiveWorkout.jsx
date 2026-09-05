@@ -7,9 +7,9 @@ import { exerciseById } from '../lib/exercises'
 import { lastSessionSets } from '../lib/selectors'
 import { fmtElapsed, todayISO } from '../lib/format'
 
-function unitName(ex) {
+function unitName(ex, exercises) {
   const ids = ex.blockType === 'superset' ? ex.exerciseIds : [ex.exerciseId]
-  return ids.map((id) => exerciseById(id)?.name || id).join(' + ')
+  return ids.map((id) => exerciseById(id, exercises)?.name || id).join(' + ')
 }
 
 function beep() {
@@ -27,7 +27,7 @@ function beep() {
 }
 
 export default function ActiveWorkout() {
-  const { state, dispatch } = useStore()
+  const { state, dispatch, exercises } = useStore()
   const navigate = useNavigate()
   const aw = state.activeWorkout
   const [now, setNow] = useState(Date.now())
@@ -142,7 +142,7 @@ export default function ActiveWorkout() {
                   color: active ? '#fff' : done ? 'var(--accent-dark)' : 'var(--text)',
                 }}
               >
-                {unitName(ex)}
+                {unitName(ex, exercises)}
               </button>
             )
           })}
@@ -152,7 +152,7 @@ export default function ActiveWorkout() {
           <div className="rounded-[20px] border p-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
             <div className="flex items-start justify-between">
               <div>
-                <div className="font-serif text-[19px] font-semibold truncate">{unitName(current)}</div>
+                <div className="font-serif text-[19px] font-semibold truncate">{unitName(current, exercises)}</div>
                 <div className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>Target {current.target}</div>
               </div>
               {!isSuperset && (
@@ -232,7 +232,7 @@ export default function ActiveWorkout() {
                     if (rowIndex >= current.sets.length) return null
                     return (
                       <div key={rowIndex}>
-                        <div className="text-[11.5px] font-semibold" style={{ color: 'var(--muted)' }}>{exerciseById(exId)?.name || exId}</div>
+                        <div className="text-[11.5px] font-semibold" style={{ color: 'var(--muted)' }}>{exerciseById(exId, exercises)?.name || exId}</div>
                         <SetRow
                           exerciseIndex={aw.currentIndex}
                           setIndex={rowIndex}
@@ -282,7 +282,7 @@ export default function ActiveWorkout() {
         {prVisible && (
           <div className="sticky top-0 z-10 flex justify-center py-1.5" style={{ pointerEvents: 'none' }}>
             <div className="pr-pop rounded-full px-4 py-2 text-sm font-bold text-white shadow-lg" style={{ background: 'var(--accent)' }}>
-              🏆 New PR — {exerciseById(prExerciseId)?.name}
+              🏆 New PR — {exerciseById(prExerciseId, exercises)?.name || prExerciseId}
             </div>
           </div>
         )}

@@ -14,7 +14,7 @@ import { exerciseById } from '../lib/exercises'
 import { dueInfo, weekdayName } from '../lib/schedule'
 
 export default function Home() {
-  const { state, dispatch } = useStore()
+  const { state, dispatch, exercises } = useStore()
   const navigate = useNavigate()
   const [metric, setMetric] = useState('workouts')
   const [rangeDays, setRangeDays] = useState(30)
@@ -24,7 +24,7 @@ export default function Home() {
   const nextRoutineId = state.routineOrder[state.sequenceIndex] || state.routineOrder[0]
   const nextRoutine = state.routines.find((r) => r.id === nextRoutineId)
   const preview = nextRoutine
-    ? nextRoutine.blocks.flatMap((b) => b.exerciseIds).slice(0, 3).map((id) => exerciseById(id)?.name).filter(Boolean).join(', ')
+    ? nextRoutine.blocks.flatMap((b) => b.exerciseIds).slice(0, 3).map((id) => exerciseById(id, exercises)?.name).filter(Boolean).join(', ')
     : ''
 
   const schedule = state.routineMode === 'weekday' && nextRoutine
@@ -37,7 +37,7 @@ export default function Home() {
   }, [state.sessions])
   const activeExerciseId = selectedExercise || topExercises[0] || null
   const series = useMemo(() => chartSeries(state.sessions, metric, rangeDays, activeExerciseId), [state.sessions, metric, rangeDays, activeExerciseId])
-  const weekCounts = useMemo(() => muscleSetCounts(sessionsSince(state.sessions, daysAgo(6))), [state.sessions])
+  const weekCounts = useMemo(() => muscleSetCounts(sessionsSince(state.sessions, daysAgo(6)), exercises), [state.sessions, exercises])
   const intensities = useMemo(() => regionIntensities(weekCounts), [weekCounts])
 
   const hasHistory = state.sessions.length > 0
@@ -120,7 +120,7 @@ export default function Home() {
         <div className="font-serif mb-2.5 text-base font-semibold">Goals</div>
         <div className="flex flex-col gap-2.5">
           {state.goals.map((goal) => {
-            const p = goalProgress(goal, state.sessions)
+            const p = goalProgress(goal, state.sessions, exercises)
             return (
               <Card key={goal.id} onClick={() => navigate('/stats/log')}>
                 <div className="mb-2 flex justify-between gap-2.5 text-[13px]">
@@ -183,7 +183,7 @@ export default function Home() {
                 onChange={(e) => setSelectedExercise(e.target.value)}
               >
                 {topExercises.map((id) => (
-                  <option key={id} value={id}>{exerciseById(id)?.name}</option>
+                  <option key={id} value={id}>{exerciseById(id, exercises)?.name}</option>
                 ))}
               </select>
             )}

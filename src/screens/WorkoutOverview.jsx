@@ -25,7 +25,7 @@ function estimateDuration(routine) {
 
 export default function WorkoutOverview() {
   const { id } = useParams()
-  const { state, dispatch } = useStore()
+  const { state, dispatch, exercises } = useStore()
   const navigate = useNavigate()
   const { showToast } = useToast()
 
@@ -36,12 +36,12 @@ export default function WorkoutOverview() {
     return routine.blocks.flatMap((block) =>
       block.exerciseIds.map((exId) => ({
         exId,
-        name: exerciseById(exId)?.name || exId,
+        name: exerciseById(exId, exercises)?.name || exId,
         target: blockTarget(block),
         spark: topSetSparklinePoints(state.sessions, exId, 7),
       }))
     )
-  }, [routine, state.sessions])
+  }, [routine, state.sessions, exercises])
 
   useEffect(() => {
     if (!routine) navigate('/routines', { replace: true })

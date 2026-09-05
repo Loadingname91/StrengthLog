@@ -8,7 +8,7 @@ function topSet(sets) {
 
 // Plain-language callouts generated straight from logged numbers — no
 // external model call, just arithmetic over exerciseHistory/session data.
-export function buildInsights(sessions) {
+export function buildInsights(sessions, exercises) {
   const insights = []
   const counts = exerciseSetCounts(sessions)
   const trackedIds = Object.keys(counts).filter((id) => counts[id] >= 4)
@@ -16,7 +16,7 @@ export function buildInsights(sessions) {
   const gains = []
   const stalls = []
   for (const id of trackedIds) {
-    const ex = exerciseById(id)
+    const ex = exerciseById(id, exercises)
     if (!ex) continue
     const hist = exerciseHistory(sessions, id).filter((h) => h.date >= localISODate(daysAgo(56)))
     if (hist.length < 3) continue

@@ -10,7 +10,7 @@ import { sessionsInRange } from '../lib/selectors'
 import { todayISO } from '../lib/format'
 
 export default function ExportInsights() {
-  const { state } = useStore()
+  const { state, exercises } = useStore()
   const navigate = useNavigate()
   const { showToast } = useToast()
   const [from, setFrom] = useState('')
@@ -21,7 +21,7 @@ export default function ExportInsights() {
     return sessionsInRange(state.sessions, new Date(from), new Date(to || todayISO()))
   }, [state.sessions, from, to])
 
-  const insights = useMemo(() => buildInsights(inRange), [inRange])
+  const insights = useMemo(() => buildInsights(inRange, exercises), [inRange, exercises])
   const hasData = inRange.length > 0
 
   function exportCSV() {
@@ -30,7 +30,7 @@ export default function ExportInsights() {
     for (const s of inRange) {
       for (const entry of s.entries) {
         entry.sets.forEach((set, i) => {
-          rows.push([s.date, s.routineName, exerciseById(entry.exerciseId)?.name || entry.exerciseId, i + 1, set.weight, set.reps, set.rir ?? ''])
+          rows.push([s.date, s.routineName, exerciseById(entry.exerciseId, exercises)?.name || entry.exerciseId, i + 1, set.weight, set.reps, set.rir ?? ''])
         })
       }
     }

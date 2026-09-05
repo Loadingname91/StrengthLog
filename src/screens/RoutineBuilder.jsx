@@ -11,7 +11,7 @@ import { backfillSequence, sequenceSetCount, sequenceRestTotal } from '../lib/bl
 
 export default function RoutineBuilder() {
   const { id } = useParams()
-  const { state, dispatch } = useStore()
+  const { state, dispatch, exercises } = useStore()
   const navigate = useNavigate()
   const editing = state.routines.find((r) => r.id === id)
 
@@ -253,6 +253,7 @@ export default function RoutineBuilder() {
         <BlockEditSheet
           block={editingBlock}
           restDefault={state.settings.restDefault}
+          exercises={exercises}
           onCancel={() => setEditingBlock(null)}
           onSave={saveBlockEdit}
         />
@@ -267,7 +268,8 @@ function BlockRow({
   onToggle, onEdit, onUngroup, onRemove,
   menuOpen, onToggleMenu, onCloseMenu,
 }) {
-  const names = block.exerciseIds.map((id) => exerciseById(id)?.name || id).join(' + ')
+  const { exercises } = useStore()
+  const names = block.exerciseIds.map((id) => exerciseById(id, exercises)?.name || id).join(' + ')
   return (
     <div
       ref={setRowRef}
@@ -325,7 +327,7 @@ function BlockRow({
   )
 }
 
-export function BlockEditSheet({ block, restDefault, onCancel, onSave }) {
+export function BlockEditSheet({ block, restDefault, onCancel, onSave, exercises }) {
   const [sequence, setSequence] = useState(() => backfillSequence(block).sequence)
   const [repMin, setRepMin] = useState(block.repMin)
   const [repMax, setRepMax] = useState(block.repMax)
@@ -401,7 +403,7 @@ export function BlockEditSheet({ block, restDefault, onCancel, onSave }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onCancel}>
       <div className="fade-in mx-auto w-full max-w-[480px] rounded-t-[24px] p-5" style={{ background: 'var(--surface)' }} onClick={(e) => e.stopPropagation()}>
-        <div className="font-serif text-lg font-semibold">{block.exerciseIds.map((id) => exerciseById(id)?.name || id).join(' + ')}</div>
+        <div className="font-serif text-lg font-semibold">{block.exerciseIds.map((id) => exerciseById(id, exercises)?.name || id).join(' + ')}</div>
         <div className="mt-3 grid grid-cols-2 gap-3">
           <Field label="Min reps"><input type="number" value={repMin} onChange={(e) => setRepMin(Number(e.target.value))} className="w-full rounded-xl border p-2 text-sm" style={{ borderColor: 'var(--border)' }} /></Field>
           <Field label="Max reps"><input type="number" value={repMax} onChange={(e) => setRepMax(Number(e.target.value))} className="w-full rounded-xl border p-2 text-sm" style={{ borderColor: 'var(--border)' }} /></Field>

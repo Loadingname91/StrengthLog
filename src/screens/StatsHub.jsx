@@ -119,13 +119,13 @@ function StatTile({ label, value }) {
 }
 
 function MusclesTab() {
-  const { state } = useStore()
+  const { state, exercises } = useStore()
   const navigate = useNavigate()
   const [rangeDays, setRangeDays] = useState(30)
   const [filterMuscles, setFilterMuscles] = useState(null)
 
   const inRange = useMemo(() => sessionsSince(state.sessions, daysAgo(rangeDays - 1)), [state.sessions, rangeDays])
-  const muscleCounts = useMemo(() => muscleSetCounts(inRange), [inRange])
+  const muscleCounts = useMemo(() => muscleSetCounts(inRange, exercises), [inRange, exercises])
   const intensities = useMemo(() => regionIntensities(muscleCounts), [muscleCounts])
   const weeks = Math.max(1, rangeDays / 7)
 
@@ -138,9 +138,9 @@ function MusclesTab() {
   const exerciseCounts = useMemo(() => exerciseSetCounts(inRange), [inRange])
   const exerciseRows = useMemo(() => {
     let ids = Object.keys(exerciseCounts)
-    if (filterMuscles) ids = ids.filter((id) => { const ex = exerciseById(id); return ex && (filterMuscles.includes(ex.primary) || filterMuscles.includes(ex.secondary)) })
-    return ids.map((id) => ({ id, name: exerciseById(id)?.name || id, sets: exerciseCounts[id] })).sort((a, b) => b.sets - a.sets)
-  }, [exerciseCounts, filterMuscles])
+    if (filterMuscles) ids = ids.filter((id) => { const ex = exerciseById(id, exercises); return ex && (filterMuscles.includes(ex.primary) || filterMuscles.includes(ex.secondary)) })
+    return ids.map((id) => ({ id, name: exerciseById(id, exercises)?.name || id, sets: exerciseCounts[id] })).sort((a, b) => b.sets - a.sets)
+  }, [exerciseCounts, filterMuscles, exercises])
 
   return (
     <div className="flex flex-col gap-5 px-5">
@@ -187,7 +187,7 @@ function MusclesTab() {
 }
 
 function LogTab() {
-  const { state } = useStore()
+  const { state, exercises } = useStore()
   const navigate = useNavigate()
   const [routineFilter, setRoutineFilter] = useState('all')
   const [openId, setOpenId] = useState(null)
@@ -223,7 +223,7 @@ function LogTab() {
                 <div className="flex flex-col gap-1.5 border-t px-3.5 pb-3.5 pt-2.5" style={{ borderColor: 'var(--border)' }}>
                   {session.entries.map((entry, i) => (
                     <div key={i} onClick={() => navigate(`/exercise/${entry.exerciseId}`)} className="flex cursor-pointer justify-between text-xs">
-                      <span>{exerciseById(entry.exerciseId)?.name || entry.exerciseId}</span>
+                      <span>{exerciseById(entry.exerciseId, exercises)?.name || entry.exerciseId}</span>
                       <span className="tabular-nums" style={{ color: 'var(--muted)' }}>{entry.sets.map((s) => `${s.weight}×${s.reps}`).join(', ')}</span>
                     </div>
                   ))}
