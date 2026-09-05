@@ -295,7 +295,7 @@ function BlockRow({
   )
 }
 
-function BlockEditSheet({ block, onCancel, onSave }) {
+export function BlockEditSheet({ block, onCancel, onSave }) {
   const [sets, setSets] = useState(block.sets)
   const [repMin, setRepMin] = useState(block.repMin)
   const [repMax, setRepMax] = useState(block.repMax)

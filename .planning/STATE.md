@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 4
 current_phase_name: Test Suite & Regression Safety Net
-status: executing
-stopped_at: Phase 01 UI-SPEC approved
-last_updated: "2026-09-05T09:27:30.207Z"
+status: complete
+stopped_at: Phase 04 verified, milestone complete
+last_updated: "2026-09-05T10:15:00.000Z"
 last_activity: 2026-09-05
-last_activity_desc: Phase 03 complete, transitioned to Phase 4
+last_activity_desc: Phase 04 Task 3 (smoke tests) and Task 4 (clean-run verification) completed; all 4 phases done
 progress:
   total_phases: 4
-  completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
-  percent: 75
+  completed_phases: 4
+  total_plans: 6
+  completed_plans: 6
+  percent: 100
 ---
 
 # Project State
@@ -24,16 +24,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-05)
 
 **Core value:** Logging a workout mid-session — weight, reps, RIR, rest — must be fast, reliable, and never lose data, even if the user backgrounds the app or navigates away mid-session.
-**Current focus:** Phase 01 — fresh-install-safe-deletion
+**Current focus:** Milestone v1.0 complete — all 4 phases shipped
 
 ## Current Position
 
-Phase: 4 — Test Suite & Regression Safety Net
-Plan: Not started
-Status: Executing Phase 01
-Last activity: 2026-09-05 — Phase 03 complete, transitioned to Phase 4
+Phase: 4 of 4 — Test Suite & Regression Safety Net (complete)
+Plan: 04-01-PLAN.md complete
+Status: Milestone complete
+Last activity: 2026-09-05 — Phase 04 finished: smoke tests for hold gesture/target-weight/session bar added, `npm test` + `npm run lint` + `npm run build` all clean
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -50,6 +50,7 @@ Progress: [░░░░░░░░░░] 0%
 | 01 | 2 | - | - |
 | 02 | 2 | - | - |
 | 03 | 1 | - | - |
+| 04 | 1 | ~35 min | ~35 min |
 
 **Recent Trend:**
 
@@ -75,9 +76,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- Phase 3 (Interaction Quality Audit) depends on Phases 1-2 landing first since it audits the full, updated feature surface including the new deletion gesture, target-weight field, and session bar.
-- Phase 4 (Testing) depends on Phases 1-3 since its interaction tests target the delete long-press, target-weight field, and session bar built in earlier phases.
-- `CONCERNS.md` flags `src/lib/schedule.js` (weekday scheduling date arithmetic) and `src/lib/csvImport.js` as fragile with zero test coverage today — worth prioritizing if Phase 4's reducer test scope has room beyond the milestone's required actions.
+None currently blocking — milestone complete. Carried-forward notes:
+
+- `CONCERNS.md` flags `src/lib/schedule.js` (weekday scheduling date arithmetic) and `src/lib/csvImport.js` as fragile with zero test coverage — out of this milestone's required TEST-01..04 scope, but a good candidate for a future milestone's test expansion.
+- On-device UAT for Phases 1-3 was explicitly deferred by user direction (no device/browser available in this execution environment) — `01-UAT.md`, `02-UAT.md`, `03-UAT.md` are all `status: partial`. Phase 4's own success criteria are fully machine-verifiable, so this gap doesn't block milestone completion, but a real-device pass is still recommended before considering the milestone fully closed out in practice.
 
 ## Deferred Items
 
@@ -89,6 +91,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-05T07:57:44.627Z
-Stopped at: Phase 01 UI-SPEC approved
-Resume file: .planning/phases/01-fresh-install-safe-deletion/01-UI-SPEC.md
+Last session: 2026-09-05T10:15:00.000Z
+Stopped at: Phase 04 verified, milestone v1.0 complete
+Resume file: .planning/phases/04-test-suite-regression-safety-net/04-VERIFICATION.md

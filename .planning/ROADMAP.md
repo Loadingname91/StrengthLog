@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Fresh Install & Safe Deletion** - New installs start completely empty and "Delete all data" requires a deliberate press-and-hold instead of a single tap (completed 2026-09-05)
 - [x] **Phase 2: Uninterrupted Workout Sessions** - Active workouts show correct placeholder guidance and survive navigation, backgrounding, and the hardware back button without losing the user's place (completed 2026-09-05)
 - [x] **Phase 3: Interaction Quality Audit** - Every control on every screen is manually verified to do what it claims, with defects fixed or explicitly deferred (completed 2026-09-05)
-- [ ] **Phase 4: Test Suite & Regression Safety Net** - A Vitest + Testing Library suite covers this milestone's riskiest logic and newest features, running clean alongside lint
+- [x] **Phase 4: Test Suite & Regression Safety Net** - A Vitest + Testing Library suite covers this milestone's riskiest logic and newest features, running clean alongside lint (completed 2026-09-05)
 
 ## Phase Details
 
@@ -90,7 +90,9 @@ Plans:
   3. The delete-all long-press gesture, the target-weight field, and the persistent session bar each have at least one passing smoke-level interaction test.
   4. `npm run lint` and the new test command both exit clean (zero errors) in the same run.
 
-**Plans**: TBD
+**Plans**: 1/1 plans complete
+
+- [x] 04-01-PLAN.md
 
 ## Progress
 
@@ -102,4 +104,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Fresh Install & Safe Deletion | 2/2 | Complete    | 2026-09-05 |
 | 2. Uninterrupted Workout Sessions | 2/2 | Complete    | 2026-09-05 |
 | 3. Interaction Quality Audit | 1/1 | Complete    | 2026-09-05 |
-| 4. Test Suite & Regression Safety Net | 0/TBD | Not started | - |
+| 4. Test Suite & Regression Safety Net | 1/1 | Complete    | 2026-09-05 |
