@@ -2,10 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../state/StoreContext'
 import ConfirmSheet from '../components/ConfirmSheet'
-import { BackIcon } from '../components/Icons'
+import { BackIcon, ClockIcon } from '../components/Icons'
 import { exerciseById } from '../lib/exercises'
 import { lastSessionSets } from '../lib/selectors'
 import { fmtElapsed, todayISO } from '../lib/format'
+
+function unitName(ex) {
+  const ids = ex.blockType === 'superset' ? ex.exerciseIds : [ex.exerciseId]
+  return ids.map((id) => exerciseById(id)?.name || id).join(' + ')
+}
 
 function beep() {
   try {
@@ -74,15 +79,23 @@ export default function ActiveWorkout() {
   const doneExercises = aw.exercises.filter((ex) => ex.sets.every((s) => s.done)).length
   const progressPct = Math.round((doneExercises / aw.exercises.length) * 100)
   const current = aw.exercises[aw.currentIndex]
-  const currentExerciseInfo = exerciseById(current.exerciseId)
-  const ghostSets = lastSessionSets(state.sessions, current.exerciseId, todayISO())
+  const isSuperset = current.blockType === 'superset'
+  const unitExerciseIds = isSuperset ? current.exerciseIds : [current.exerciseId]
+  const ghostByExercise = unitExerciseIds.map((exId) => lastSessionSets(state.sessions, exId, todayISO()))
+  function ghostFor(si) {
+    const exIdx = current.sets[si].exerciseIndex
+    const roundIdx = Math.floor(si / unitExerciseIds.length)
+    return ghostByExercise[exIdx]?.[roundIdx]
+  }
 
   const restRemaining = aw.restUntil ? Math.max(0, Math.ceil((new Date(aw.restUntil).getTime() - now) / 1000)) : 0
-  const restTotal = aw.restExerciseIndex != null ? aw.exercises[aw.restExerciseIndex]?.rest || 90 : 90
+  const restTotal = aw.restTotalSec || 90
   const restVisible = aw.restUntil && restRemaining > 0
-  const showNoRestHint = current.blockType === 'superset' && current.pairIndex < current.pairSize - 1
 
   const prExercise = prBadge ? aw.exercises[prBadge.exerciseIndex] : null
+  const prExerciseId = prExercise
+    ? (prExercise.blockType === 'superset' ? prExercise.exerciseIds[prExercise.sets[prBadge.setIndex]?.exerciseIndex] : prExercise.exerciseId)
+    : null
   const prVisible = !!prExercise
 
   const allSetsLogged = aw.exercises.every((ex) => ex.sets.every((s) => s.done))
@@ -129,7 +142,7 @@ export default function ActiveWorkout() {
                   color: active ? '#fff' : done ? 'var(--accent-dark)' : 'var(--text)',
                 }}
               >
-                {exerciseById(ex.exerciseId)?.name || ex.exerciseId}
+                {unitName(ex)}
               </button>
             )
           })}
@@ -139,53 +152,113 @@ export default function ActiveWorkout() {
           <div className="rounded-[20px] border p-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
             <div className="flex items-start justify-between">
               <div>
-                <div className="font-serif text-[19px] font-semibold">{currentExerciseInfo?.name}</div>
+                <div className="font-serif text-[19px] font-semibold truncate">{unitName(current)}</div>
                 <div className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>Target {current.target}</div>
               </div>
-              <button
-                onClick={() => setHelpFor(helpFor === current.exerciseId ? null : current.exerciseId)}
-                className="flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold"
-                style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
-              >
-                ?
-              </button>
+              {!isSuperset && (
+                <button
+                  onClick={() => setHelpFor(helpFor === current.exerciseId ? null : current.exerciseId)}
+                  className="flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold"
+                  style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
+                >
+                  ?
+                </button>
+              )}
             </div>
-            {helpFor === current.exerciseId && (
+            {!isSuperset && helpFor === current.exerciseId && (
               <div className="mt-2 rounded-xl p-2.5 text-xs" style={{ background: 'var(--surface-alt)', color: 'var(--muted)' }}>
                 {state.exerciseNotes[current.exerciseId] || 'Control the eccentric, keep tension on the target muscle, and stop 1-2 reps shy of failure.'}
               </div>
             )}
 
-            {showNoRestHint && (
-              <div className="mt-2 rounded-xl px-3 py-1.5 text-center text-xs font-semibold" style={{ background: 'var(--accent-light)', color: 'var(--accent-dark)' }}>
-                No rest — next exercise
+            {!isSuperset && (
+              <div className="mt-4 grid grid-cols-[28px_1fr_1fr_1fr_30px] items-center gap-2 text-[11px] font-semibold" style={{ color: 'var(--muted)' }}>
+                <span>Set</span><span>Last</span><span>Weight</span><span>Reps</span><span />
               </div>
             )}
 
-            <div className="mt-4 grid grid-cols-[28px_1fr_1fr_1fr_30px] items-center gap-2 text-[11px] font-semibold" style={{ color: 'var(--muted)' }}>
-              <span>Set</span><span>Last</span><span>Weight</span><span>Reps</span><span />
-            </div>
+            {current.sets.map((set, si) => {
+              const restSeconds = current.restAfter[si]
+              const restState = !set.done ? 'upcoming'
+                : (aw.restUntil && aw.restTotalSec === restSeconds) ? 'active'
+                  : 'passed'
+              const restRow = restSeconds != null && (
+                <RestRow key={`rest-${si}`} seconds={restSeconds} rowState={restState} remaining={restRemaining} />
+              )
 
-            {current.sets.map((set, si) => (
-              <SetRow
-                key={si}
-                exerciseIndex={aw.currentIndex}
-                setIndex={si}
-                set={set}
-                ghost={ghostSets?.[si]}
-                targetWeight={current.targetWeight}
-                showRIR={state.settings.showRIR}
-                isLastSet={si === current.sets.length - 1}
-                registerWeightRef={(el) => { weightRefs.current[si] = el }}
-                registerRepsRef={(el) => { repsRefs.current[si] = el }}
-                focusReps={() => repsRefs.current[si]?.focus()}
-                focusNextWeightOrBlur={() => {
-                  const next = weightRefs.current[si + 1]
-                  if (next) next.focus()
-                  else repsRefs.current[si]?.blur()
-                }}
-              />
-            ))}
+              if (!isSuperset) {
+                return (
+                  <div key={si}>
+                    <SetRow
+                      exerciseIndex={aw.currentIndex}
+                      setIndex={si}
+                      set={set}
+                      ghost={ghostFor(si)}
+                      targetWeight={current.targetWeight}
+                      showRIR={state.settings.showRIR}
+                      isLastSet={si === current.sets.length - 1}
+                      registerWeightRef={(el) => { weightRefs.current[si] = el }}
+                      registerRepsRef={(el) => { repsRefs.current[si] = el }}
+                      focusReps={() => repsRefs.current[si]?.focus()}
+                      focusNextWeightOrBlur={() => {
+                        const next = weightRefs.current[si + 1]
+                        if (next) next.focus()
+                        else repsRefs.current[si]?.blur()
+                      }}
+                    />
+                    {restRow}
+                  </div>
+                )
+              }
+
+              // Superset: group every unitExerciseIds.length consecutive
+              // sets into one visually-grouped round, each row labeled by
+              // the exercise it belongs to. Only the round's first position
+              // opens the group wrapper; the rest ride along inside it.
+              const posInRound = si % unitExerciseIds.length
+              if (posInRound !== 0) return null
+              const lastInRound = si + unitExerciseIds.length - 1
+              const roundRestSeconds = current.restAfter[lastInRound]
+              const roundRestState = !current.sets[lastInRound]?.done ? 'upcoming'
+                : (aw.restUntil && aw.restTotalSec === roundRestSeconds) ? 'active'
+                  : 'passed'
+              return (
+                <div key={`round-${si}`} className="mt-2.5 rounded-xl p-2.5" style={{ background: 'var(--surface-alt)' }}>
+                  <div className="mb-1.5 text-[13px] font-bold" style={{ color: 'var(--muted)' }}>
+                    Round {Math.floor(si / unitExerciseIds.length) + 1}
+                  </div>
+                  {unitExerciseIds.map((exId, k) => {
+                    const rowIndex = si + k
+                    if (rowIndex >= current.sets.length) return null
+                    return (
+                      <div key={rowIndex}>
+                        <div className="text-[11.5px] font-semibold" style={{ color: 'var(--muted)' }}>{exerciseById(exId)?.name || exId}</div>
+                        <SetRow
+                          exerciseIndex={aw.currentIndex}
+                          setIndex={rowIndex}
+                          set={current.sets[rowIndex]}
+                          ghost={ghostFor(rowIndex)}
+                          targetWeight={current.targetWeight}
+                          showRIR={state.settings.showRIR}
+                          isLastSet={rowIndex === current.sets.length - 1}
+                          registerWeightRef={(el) => { weightRefs.current[rowIndex] = el }}
+                          registerRepsRef={(el) => { repsRefs.current[rowIndex] = el }}
+                          focusReps={() => repsRefs.current[rowIndex]?.focus()}
+                          focusNextWeightOrBlur={() => {
+                            const next = weightRefs.current[rowIndex + 1]
+                            if (next) next.focus()
+                            else repsRefs.current[rowIndex]?.blur()
+                          }}
+                        />
+                      </div>
+                    )
+                  })}
+                  {roundRestSeconds != null && (
+                    <RestRow seconds={roundRestSeconds} rowState={roundRestState} remaining={restRemaining} />
+                  )}
+                </div>
+              )
+            })}
 
             <div className="mt-2.5 flex gap-2">
               <button
@@ -209,7 +282,7 @@ export default function ActiveWorkout() {
         {prVisible && (
           <div className="sticky top-0 z-10 flex justify-center py-1.5" style={{ pointerEvents: 'none' }}>
             <div className="pr-pop rounded-full px-4 py-2 text-sm font-bold text-white shadow-lg" style={{ background: 'var(--accent)' }}>
-              🏆 New PR — {exerciseById(prExercise.exerciseId)?.name}
+              🏆 New PR — {exerciseById(prExerciseId)?.name}
             </div>
           </div>
         )}
@@ -249,6 +322,23 @@ export default function ActiveWorkout() {
         onCancel={() => setConfirmFinish(false)}
         onConfirm={doFinish}
       />
+    </div>
+  )
+}
+
+// Inline row reflecting the routine's authored rest plan (upcoming/active/
+// passed), shown in the set list alongside — not instead of — the sticky
+// bottom countdown overlay, which remains the live, actionable rest UI.
+function RestRow({ seconds, rowState, remaining }) {
+  const opacity = rowState === 'passed' ? 0.4 : rowState === 'upcoming' ? 0.6 : 1
+  const label = rowState === 'active' ? `Rest — ${fmtElapsed(remaining)} left` : `Rest — ${seconds}s`
+  return (
+    <div
+      className="my-1.5 flex items-center gap-2 rounded-lg border border-dashed p-2"
+      style={{ borderColor: 'var(--border)', background: 'var(--surface-alt)', opacity }}
+    >
+      <ClockIcon size={14} style={{ color: 'var(--muted)' }} />
+      <span className="text-xs" style={{ color: 'var(--muted)' }}>{label}</span>
     </div>
   )
 }

@@ -71,25 +71,51 @@ function twoSetWorkout() {
     exercises: [
       {
         exerciseId: 'bench-press',
+        exerciseIds: ['bench-press'],
         blockId: 'block1',
         blockType: 'single',
-        pairIndex: 0,
-        pairSize: 1,
         target: '2x8-12',
-        rest: 90,
         rir: null,
         targetWeight: null,
         sets: [
-          { weight: '', reps: '', rir: null, done: false, isPR: false },
-          { weight: '', reps: '', rir: null, done: false, isPR: false },
+          { weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 0 },
+          { weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 0 },
         ],
+        restAfter: [90, null],
       },
     ],
   }
 }
 
-function renderWorkout() {
-  testStore = createTestStore(baseState(twoSetWorkout()))
+function supersetWorkout() {
+  return {
+    id: 'w1',
+    routineId: 'r1',
+    routineName: 'Push Day',
+    startedAt: new Date().toISOString(),
+    currentIndex: 0,
+    restUntil: null,
+    restExerciseIndex: null,
+    exercises: [
+      {
+        exerciseIds: ['bench-press', 'barbell-row'],
+        blockId: 'block1',
+        blockType: 'superset',
+        target: '2x8-12',
+        rir: null,
+        targetWeight: null,
+        sets: [
+          { weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 0 },
+          { weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 1 },
+        ],
+        restAfter: [null, 120],
+      },
+    ],
+  }
+}
+
+function renderWorkout(activeWorkout = twoSetWorkout()) {
+  testStore = createTestStore(baseState(activeWorkout))
   return render(
     <MemoryRouter>
       <ActiveWorkout />
@@ -161,5 +187,49 @@ describe('ActiveWorkout fast set entry', () => {
 
     expect(testStore.getState().activeWorkout.exercises[0].sets[0].done).toBe(true)
     expect(testStore.getState().activeWorkout.exercises[0].sets[1].done).toBe(true)
+  })
+})
+
+describe('ActiveWorkout merged superset (Phase 6)', () => {
+  it('renders both exercise names and a single round grouping, no per-exercise tabs', () => {
+    renderWorkout(supersetWorkout())
+
+    expect(screen.getAllByText('Bench Press + Barbell Row').length).toBeGreaterThan(0)
+    expect(screen.getByText('Round 1')).toBeInTheDocument()
+    expect(screen.getByText('Bench Press')).toBeInTheDocument()
+    expect(screen.getByText('Barbell Row')).toBeInTheDocument()
+  })
+
+  it('does not show the single-exercise-only help ("?") button', () => {
+    renderWorkout(supersetWorkout())
+    expect(screen.queryByText('?')).not.toBeInTheDocument()
+  })
+
+  it('SUPER-02: confirming the first exercise\'s reps auto-advances focus into the second exercise\'s weight, within the same round', () => {
+    renderWorkout(supersetWorkout())
+
+    fireEvent.change(weightInputs()[0], { target: { value: '60' } })
+    fireEvent.change(repsInputs()[0], { target: { value: '10' } })
+    fireEvent.blur(repsInputs()[0])
+
+    expect(document.activeElement).toBe(weightInputs()[1])
+    // Rest is only authored after the round's second exercise — completing
+    // just the first must not start it.
+    expect(testStore.getState().activeWorkout.restUntil).toBeNull()
+  })
+
+  it('rest starts only once the round\'s second exercise is also completed', () => {
+    renderWorkout(supersetWorkout())
+
+    fireEvent.change(weightInputs()[0], { target: { value: '60' } })
+    fireEvent.change(repsInputs()[0], { target: { value: '10' } })
+    fireEvent.blur(repsInputs()[0])
+    fireEvent.change(weightInputs()[1], { target: { value: '50' } })
+    fireEvent.change(repsInputs()[1], { target: { value: '10' } })
+    fireEvent.blur(repsInputs()[1])
+
+    const aw = testStore.getState().activeWorkout
+    expect(aw.restUntil).not.toBeNull()
+    expect(aw.restTotalSec).toBe(120)
   })
 })
