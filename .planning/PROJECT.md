@@ -29,16 +29,15 @@ Logging a workout mid-session — weight, reps, RIR, rest — must be fast, reli
 - ✓ `RoutineBuilder.jsx` drag-to-reorder gesture now aborts on `visibilitychange`/`blur` (app backgrounded mid-drag), closing the one finding Phase 3 deliberately deferred — post-milestone fix
 - ✓ React error boundary added around the route tree — a crash in one screen no longer white-screens the whole app; BottomNav/SessionBar/back-button handling stay alive and a "Try again" resets to Home — post-milestone fix
 - ✓ Corrupted `localStorage` blob is now backed up (not silently destroyed) before the app falls back to a fresh empty state — closes the direct conflict between the old silent-discard behavior and this project's stated "never lose data" core value; no recovery UI yet (see `CONCERNS.md`) — post-milestone fix
+- ✓ Active Workout's weight/reps inputs enlarged to a touch-friendly size, with a confirm-to-advance focus chain (Weight → Reps → next set's Weight) and auto-mark-done once both fields are valid — the checkmark stays a manual override — Phase 5
+- ✓ Routine Builder's block editor replaces the flat "Sets" count with an explicit, editable sequence of set/round and rest rows — rest is addable/removable/individually editable, defaulting new rows from Settings' "Default rest (sec)" — Phase 6
+- ✓ Merging exercises into a superset produces a sequence that alternates rounds with rest only after each full round; Active Workout renders a merged superset as one interleaved flow (both exercises' current round together) and auto-advances between them using the same focus chain Phase 5 built — Phase 6
 
 ### Active
 
 v1.0 stabilization milestone: none — all requirements validated and shipped.
 
-v1.1 "Smart Set Flow" milestone (in planning, 2026-09-05):
-- [ ] Bigger, touch-friendly weight/reps inputs in Active Workout with auto-advancing focus and auto-mark-done once both fields are filled
-- [ ] Rest becomes an explicit, individually-editable row in a routine block's set sequence (in Routine Builder and Active Workout), not just an implicit per-block number — new rest rows default from Settings' "Default rest (sec)"
-- [ ] Merging exercises into a superset in Routine Builder produces a sequence that alternates the exercises per round, with rest inserted only after each full round (not every individual set)
-- [ ] Active Workout auto-advances between a merged superset's exercises after each set and renders them as one interleaved flow, instead of requiring manual tab-switching
+v1.1 "Smart Set Flow" milestone: none — all requirements validated and shipped.
 
 ### Out of Scope
 
@@ -47,16 +46,26 @@ v1.1 "Smart Set Flow" milestone (in planning, 2026-09-05):
 
 ## Context
 
-- **v1.1 "Smart Set Flow" milestone opened 2026-09-05.** Three related asks from
-  real use: (1) weight/reps entry needs bigger inputs and fewer taps on a
-  phone; (2) rest needs to be an explicit, editable part of a routine's set
-  sequence rather than one implicit per-block number; (3) supersets need to
-  actually alternate exercises automatically in Active Workout, with rest
-  clustered around each full round rather than each individual set. Discussion
-  completed and design locked (see `.planning/phases/05-fast-set-entry/05-DISCUSSION-LOG.md`
-  and `.planning/phases/06-structured-sets/06-DISCUSSION-LOG.md`); phases
-  5-6 have CONTEXT.md written and are ready for UI-SPEC/planning. Requirements
-  ENTRY-01..03, REST-01..05, SUPER-01..03 added to `REQUIREMENTS.md`.
+- **v1.1 "Smart Set Flow" milestone shipped 2026-09-05**, same day it was opened.
+  Three related asks from real use: (1) weight/reps entry needed bigger inputs
+  and fewer taps on a phone; (2) rest needed to be an explicit, editable part
+  of a routine's set sequence rather than one implicit per-block number; (3)
+  supersets needed to actually alternate exercises automatically in Active
+  Workout, with rest clustered around each full round rather than each
+  individual set. Full trail: discussion (`05-DISCUSSION-LOG.md`,
+  `06-DISCUSSION-LOG.md`) → context → UI-SPEC (`06-UI-SPEC.md`, checker-passed)
+  → task-level plans → execution (`05-01-SUMMARY.md`, `06-01-SUMMARY.md`,
+  `06-02-SUMMARY.md`). One notable plan-time refinement: `06-CONTEXT.md`
+  originally sketched a nested step-type model with its own navigation
+  pointer for tracking position within a merged superset; writing the actual
+  reducer surfaced a simpler design (a flat `restAfter` array + `exerciseIndex`
+  tag alongside the existing `sets` array) that needed zero new navigation
+  state, since Phase 5's confirm-to-advance focus chain already crosses
+  between exercises correctly once the underlying array is round-ordered.
+  All 11 requirements (ENTRY-01..03, REST-01..05, SUPER-01..03) complete and
+  verified — reducer/component tests plus real-browser Playwright checks for
+  both phases, including a full single-exercise + superset workout logged
+  end-to-end and confirmed in session history.
 - Full product vision lives in `docs/app.md` (PRD) — screens, interaction rules, and the phased MVP cut this project already mostly implements
 - Fresh codebase map lives in `.planning/codebase/` (STACK, ARCHITECTURE, STRUCTURE, CONVENTIONS, TESTING, INTEGRATIONS, CONCERNS) — `TESTING.md` confirms zero test framework currently exists; `CONCERNS.md` has the fuller technical-debt list
 - App is fully offline/local-only: state persists to `localStorage` (`src/state/storage.js`), no backend, no auth, no external APIs
@@ -85,6 +94,10 @@ v1.1 "Smart Set Flow" milestone (in planning, 2026-09-05):
 | Extend test coverage to `schedule.js`/`csvImport.js`/`selectors.js` beyond Phase 4's required scope | `CONCERNS.md` called these the most fragile, highest-risk, zero-coverage files in the codebase; Phase 4 only mandated tests for this milestone's new features, leaving pre-existing fragile logic still unprotected | Shipped — post-milestone |
 | Add a React error boundary rather than a crash-reporting service | App is fully offline/local-only with no backend — a third-party crash-reporting SDK would be a new dependency for a single-user app; a boundary that keeps navigation alive and logs to console is proportionate to the actual risk | Shipped — post-milestone |
 | Back up (not fully recover) a corrupted localStorage blob | The silent-discard-then-overwrite behavior directly conflicted with the stated core value; a full recovery UI would need reordering StoreProvider/ToastProvider (StoreProvider is outer, runs before React mounts) — out of proportion for what's fundamentally a rare edge case; preserving the raw blob is the minimal fix that stops permanent data loss | Shipped — post-milestone |
+| Rest as an explicit, individually-editable row in a block's sequence, not a per-block toggle | User's explicit choice between the two options presented — matches "add a rest set" and "option to select them" read literally | Shipped — Phase 6 |
+| Merged supersets auto-advance with one interleaved view, not manual tab-switching | User's explicit choice, confirmed as "the bigger, more involved change" before proceeding | Shipped — Phase 6 |
+| Fast set entry does both auto-advance-focus and auto-mark-done, not one or the other | User selected "both" over either alone | Shipped — Phase 5 |
+| Superset runtime uses a flat `restAfter`/`exerciseIndex` design instead of the originally-sketched nested step-type model | Surfaced while writing the actual reducer code — a much smaller diff, and it means Phase 5's focus-chain already handles cross-exercise auto-advance with no new navigation state needed | Shipped — Phase 6 |
 
 ## Evolution
 

@@ -49,23 +49,23 @@ Each maps to a v1.1 roadmap phase.
 
 ### Fast Set Entry
 
-- [ ] **ENTRY-01**: Active Workout's weight/reps inputs are sized for comfortable one-handed phone entry (larger tap target and font than today's compact row)
-- [ ] **ENTRY-02**: Confirming a value in the weight field advances focus to that set's reps field; confirming reps advances focus to the next set's weight field (or blurs, on the last set) — no manual re-tapping between fields
-- [ ] **ENTRY-03**: A set is automatically marked done once both its weight and reps hold valid values — the checkmark becomes a manual override/undo, not the only way to complete a set
+- [x] **ENTRY-01**: Active Workout's weight/reps inputs are sized for comfortable one-handed phone entry (larger tap target and font than today's compact row)
+- [x] **ENTRY-02**: Confirming a value in the weight field advances focus to that set's reps field; confirming reps advances focus to the next set's weight field (or blurs, on the last set) — no manual re-tapping between fields
+- [x] **ENTRY-03**: A set is automatically marked done once both its weight and reps hold valid values — the checkmark becomes a manual override/undo, not the only way to complete a set
 
 ### Structured Rest Sets
 
-- [ ] **REST-01**: Routine Builder lets the user add and remove explicit rest rows within a block's set sequence, interleaved with sets rather than a single implicit per-block duration
-- [ ] **REST-02**: Each rest row's duration is independently editable
-- [ ] **REST-03**: A newly added rest row defaults its duration to Settings' "Default rest (sec)" value
-- [ ] **REST-04**: Existing routines saved before this milestone (a `sets` count + one `rest` value, no explicit sequence) load and behave exactly as before — backfilled into the new model with no data loss and no behavior change until edited
-- [ ] **REST-05**: Active Workout displays rest as an explicit row in the set list (not only the existing bottom sticky timer), reflecting the routine's authored sequence
+- [x] **REST-01**: Routine Builder lets the user add and remove explicit rest rows within a block's set sequence, interleaved with sets rather than a single implicit per-block duration
+- [x] **REST-02**: Each rest row's duration is independently editable
+- [x] **REST-03**: A newly added rest row defaults its duration to Settings' "Default rest (sec)" value
+- [x] **REST-04**: Existing routines saved before this milestone (a `sets` count + one `rest` value, no explicit sequence) load and behave exactly as before — backfilled into the new model with no data loss and no behavior change until edited
+- [x] **REST-05**: Active Workout displays rest as an explicit row in the set list (not only the existing bottom sticky timer), reflecting the routine's authored sequence
 
 ### Superset Merge & Flow
 
-- [ ] **SUPER-01**: Routine Builder's exercise multi-select can merge 2+ single-exercise blocks into a superset whose sets interleave — exercise A's set, then B's, then A's, then B's — with rest inserted only after each full round (every exercise in the pair has done one set), not after every individual set
-- [ ] **SUPER-02**: Active Workout auto-advances to the next exercise in a superset round immediately after a set is marked done — no manual tab-switching required to follow the intended alternating flow
-- [ ] **SUPER-03**: Active Workout renders a merged superset as one interleaved flow (both exercises' current position visible together) rather than two independent per-exercise tabs
+- [x] **SUPER-01**: Routine Builder's exercise multi-select can merge 2+ single-exercise blocks into a superset whose sets interleave — exercise A's set, then B's, then A's, then B's — with rest inserted only after each full round (every exercise in the pair has done one set), not after every individual set
+- [x] **SUPER-02**: Active Workout auto-advances to the next exercise in a superset round immediately after a set is marked done — no manual tab-switching required to follow the intended alternating flow
+- [x] **SUPER-03**: Active Workout renders a merged superset as one interleaved flow (both exercises' current position visible together) rather than two independent per-exercise tabs
 
 ## v2 Requirements
 
@@ -106,25 +106,25 @@ Deferred to a future release. Tracked but not in this milestone's roadmap.
 | TEST-02 | Phase 4 | Complete |
 | TEST-03 | Phase 4 | Complete |
 | TEST-04 | Phase 4 | Complete |
-| ENTRY-01 | Phase 5 | Pending |
-| ENTRY-02 | Phase 5 | Pending |
-| ENTRY-03 | Phase 5 | Pending |
-| REST-01 | Phase 6 | Pending |
-| REST-02 | Phase 6 | Pending |
-| REST-03 | Phase 6 | Pending |
-| REST-04 | Phase 6 | Pending |
-| REST-05 | Phase 6 | Pending |
-| SUPER-01 | Phase 6 | Pending |
-| SUPER-02 | Phase 6 | Pending |
-| SUPER-03 | Phase 6 | Pending |
+| ENTRY-01 | Phase 5 | Complete |
+| ENTRY-02 | Phase 5 | Complete |
+| ENTRY-03 | Phase 5 | Complete |
+| REST-01 | Phase 6 | Complete |
+| REST-02 | Phase 6 | Complete |
+| REST-03 | Phase 6 | Complete |
+| REST-04 | Phase 6 | Complete |
+| REST-05 | Phase 6 | Complete |
+| SUPER-01 | Phase 6 | Complete |
+| SUPER-02 | Phase 6 | Complete |
+| SUPER-03 | Phase 6 | Complete |
 
 **Coverage:**
 
 - v1 requirements: 16 total, all complete
-- v1.1 requirements: 11 total
+- v1.1 requirements: 11 total, all complete
 - Mapped to phases: 27
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-05*
-*Last updated: 2026-09-05 — v1 milestone closed (all 16 requirements complete, including Phase 4 TEST-01..04 whose checkboxes were stale); v1.1 "Smart Set Flow" requirements (ENTRY, REST, SUPER) added and mapped to Phases 5-6*
+*Last updated: 2026-09-05 — v1.1 "Smart Set Flow" shipped: all 11 requirements (ENTRY-01..03, REST-01..05, SUPER-01..03) complete across Phases 5-6. Both v1.0 and v1.1 milestones now fully closed (27/27 requirements).*

@@ -145,7 +145,7 @@ separate phases (see Phase 1 and Phase 2).
 ## Phases
 
 - [x] **Phase 5: Fast Set Entry** - Weight/reps inputs are bigger and touch-friendly; confirming a field auto-advances to the next one, and a set auto-completes once both values are filled (completed 2026-09-05)
-- [ ] **Phase 6: Structured Sets — Rest Rows & Superset Merge** - Rest becomes an explicit, editable row in a block's set sequence; merging exercises into a superset makes Active Workout auto-alternate between them with rest clustered around each full round
+- [x] **Phase 6: Structured Sets — Rest Rows & Superset Merge** - Rest becomes an explicit, editable row in a block's set sequence; merging exercises into a superset makes Active Workout auto-alternate between them with rest clustered around each full round (completed 2026-09-05)
 
 ## Phase Details
 
@@ -181,7 +181,7 @@ Plans:
 **Plans**: 2 plans, written — ready to execute (06-02 depends on 06-01)
 Plans:
 - [x] 06-01-PLAN.md — Data model (`sequence` field + backfill) and Routine Builder authoring UI (REST-01..04, SUPER-01)
-- [ ] 06-02-PLAN.md — Active Workout runtime: rest rows in the set list, superset auto-advance and merged rendering (REST-05, SUPER-02, SUPER-03)
+- [x] 06-02-PLAN.md — Active Workout runtime: rest rows in the set list, superset auto-advance and merged rendering (REST-05, SUPER-02, SUPER-03)
 **UI hint**: yes — `06-UI-SPEC.md` written and signed off (sequence editor design, merged-superset card, rest-row states)
 
 ## Progress (v1.1 — Smart Set Flow)
@@ -189,4 +189,6 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 5. Fast Set Entry | 1/1 | Complete    | 2026-09-05 |
-| 6. Structured Sets — Rest Rows & Superset Merge | 0/2 | Planned — ready to execute | - |
+| 6. Structured Sets — Rest Rows & Superset Merge | 2/2 | Complete    | 2026-09-05 |
+
+**v1.1 "Smart Set Flow" shipped 2026-09-05** — all 11 requirements complete (ENTRY-01..03, REST-01..05, SUPER-01..03).
