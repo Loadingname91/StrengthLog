@@ -87,9 +87,9 @@ None identified through static review; no bug tracker or issue list found in the
 - `src/components/ErrorBoundary.jsx` now wraps the route tree in `App.jsx` (keyed by pathname, resets on navigation), so an unhandled exception in one screen no longer white-screens the whole app — BottomNav, SessionBar, and Android back-button handling stay alive, and the user gets a "Try again" fallback. 3 passing tests in `ErrorBoundary.test.jsx`.
 - Still open: no crash/error-tracking integration (e.g. Sentry) — errors are only logged to `console.error`. Deliberately not added: this is a fully offline, single-user, local-only app with no backend, so a third-party crash-reporting SDK would be a new external dependency disproportionate to the actual risk. Revisit if the app ever gains a backend/sync feature.
 
-**No data corruption recovery:**
-- Problem: `loadState` in `src/state/storage.js` returns `null` on any parse failure, silently discarding the corrupted blob rather than attempting partial recovery or notifying the user before overwriting it on next save.
-- Blocks: A user with corrupted localStorage (e.g., from a botched app update) loses all data with no warning and no backup prompt.
+**~~No data corruption recovery~~ — PARTIALLY RESOLVED (2026-09-05):**
+- `loadState` in `src/state/storage.js` now backs up a corrupted blob under `fitlog:v1:corrupted-backup` before returning `null`, so the next `saveState` call no longer permanently destroys it. Tested in `storage.test.js`.
+- Still open: no recovery UI — the backup key exists in `localStorage` but nothing surfaces it to the user or offers to restore/export it, and no in-app warning fires when this happens (the fix runs before React mounts, outside any component with `ToastContext` access — `StoreProvider` is the outer provider in `main.jsx`, so it can't consume a toast context that hasn't mounted around it yet). A future pass could reorder providers or add a "recover corrupted backup" affordance in Settings; deliberately not done here to keep this fix minimal.
 
 ## Test Coverage Gaps
 

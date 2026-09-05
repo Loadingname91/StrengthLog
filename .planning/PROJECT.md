@@ -28,6 +28,7 @@ Logging a workout mid-session — weight, reps, RIR, rest — must be fast, reli
 - ✓ Test coverage extended to `src/lib/schedule.js`, `src/lib/csvImport.js`, `src/lib/selectors.js` (all previously untested/fragile per `CONCERNS.md`) — post-milestone fix
 - ✓ `RoutineBuilder.jsx` drag-to-reorder gesture now aborts on `visibilitychange`/`blur` (app backgrounded mid-drag), closing the one finding Phase 3 deliberately deferred — post-milestone fix
 - ✓ React error boundary added around the route tree — a crash in one screen no longer white-screens the whole app; BottomNav/SessionBar/back-button handling stay alive and a "Try again" resets to Home — post-milestone fix
+- ✓ Corrupted `localStorage` blob is now backed up (not silently destroyed) before the app falls back to a fresh empty state — closes the direct conflict between the old silent-discard behavior and this project's stated "never lose data" core value; no recovery UI yet (see `CONCERNS.md`) — post-milestone fix
 
 ### Active
 
@@ -67,6 +68,7 @@ None — all requirements for the v1.0 stabilization milestone are validated and
 | Fix the Phase 3 deferred drag-gesture finding post-milestone rather than leaving it deferred indefinitely | Same interrupted-gesture bug class already fixed once for the delete hold (CR-01); the fix is small, isolated, and now has direct test coverage — no reason to leave a known-fixable gap open once flagged | Shipped — post-milestone |
 | Extend test coverage to `schedule.js`/`csvImport.js`/`selectors.js` beyond Phase 4's required scope | `CONCERNS.md` called these the most fragile, highest-risk, zero-coverage files in the codebase; Phase 4 only mandated tests for this milestone's new features, leaving pre-existing fragile logic still unprotected | Shipped — post-milestone |
 | Add a React error boundary rather than a crash-reporting service | App is fully offline/local-only with no backend — a third-party crash-reporting SDK would be a new dependency for a single-user app; a boundary that keeps navigation alive and logs to console is proportionate to the actual risk | Shipped — post-milestone |
+| Back up (not fully recover) a corrupted localStorage blob | The silent-discard-then-overwrite behavior directly conflicted with the stated core value; a full recovery UI would need reordering StoreProvider/ToastProvider (StoreProvider is outer, runs before React mounts) — out of proportion for what's fundamentally a rare edge case; preserving the raw blob is the minimal fix that stops permanent data loss | Shipped — post-milestone |
 
 ## Evolution
 
