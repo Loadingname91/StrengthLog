@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { pushModal, popModal } from '../lib/modalStack'
 
 const HOLD_DURATION_MS = 1500
 
@@ -34,6 +35,15 @@ export default function ConfirmSheet({ open, title, body, confirmLabel = 'Confir
       setHoldPct(0)
     }
   }, [open])
+
+  // Register with the shared modal stack while open so the Android hardware
+  // back button dismisses this sheet instead of falling through to route
+  // navigation (see src/lib/modalStack.js and App.jsx's useAndroidBackButton).
+  useEffect(() => {
+    if (!open) return
+    const handle = pushModal(onCancel)
+    return () => popModal(handle)
+  }, [open, onCancel])
 
   function startHold() {
     setHolding(true)

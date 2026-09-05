@@ -5,6 +5,7 @@ import { Capacitor } from '@capacitor/core'
 import BottomNav from './components/BottomNav'
 import SessionBar from './components/SessionBar'
 import { useStore } from './state/StoreContext'
+import { dismissTopModal } from './lib/modalStack'
 import Home from './screens/Home'
 import StatsHub from './screens/StatsHub'
 import Routines from './screens/Routines'
@@ -31,6 +32,7 @@ function useAndroidBackButton() {
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
     const listenerPromise = CapacitorApp.addListener('backButton', () => {
+      if (dismissTopModal()) return
       const idx = window.history.state?.idx ?? 0
       if (idx > 0) {
         navigate(-1)
