@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../state/StoreContext'
 import ConfirmSheet from '../components/ConfirmSheet'
+import { BackIcon } from '../components/Icons'
 import { exerciseById } from '../lib/exercises'
 import { lastSessionSets } from '../lib/selectors'
 import { fmtElapsed, todayISO } from '../lib/format'
@@ -93,9 +94,10 @@ export default function ActiveWorkout() {
     <div className="relative flex h-screen flex-col">
       <div className="flex-1 overflow-auto pb-24">
         <div className="px-[18px] pb-2 pt-3.5">
-          <div className="flex items-center justify-between">
-            <div className="text-[15px] font-semibold">{aw.routineName}</div>
-            <div className="tabular-nums text-sm font-semibold" style={{ color: 'var(--accent-dark)' }}>{fmtElapsed(elapsedSec)}</div>
+          <div className="flex items-center justify-between gap-2">
+            <button onClick={() => navigate('/routines')} className="-ml-1.5 shrink-0 p-1.5"><BackIcon /></button>
+            <div className="min-w-0 flex-1 truncate text-center text-[15px] font-semibold">{aw.routineName}</div>
+            <div className="tabular-nums shrink-0 text-sm font-semibold" style={{ color: 'var(--accent-dark)' }}>{fmtElapsed(elapsedSec)}</div>
           </div>
           <div className="mt-2 h-[5px] overflow-hidden rounded-full" style={{ background: 'var(--surface-alt)' }}>
             <div className="h-full rounded-full transition-[width]" style={{ width: `${progressPct}%`, background: 'var(--accent)' }} />
@@ -214,7 +216,7 @@ export default function ActiveWorkout() {
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 border-t px-[18px] pb-3.5 pt-2.5" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-        <button onClick={finish} className="w-full rounded-2xl py-3 text-sm font-semibold text-white" style={{ background: 'var(--text)' }}>
+        <button onClick={finish} className="w-full rounded-2xl py-3 text-sm font-semibold text-white" style={{ background: 'var(--accent)' }}>
           Finish Workout
         </button>
       </div>

@@ -1,4 +1,7 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
+import { App as CapacitorApp } from '@capacitor/app'
+import { Capacitor } from '@capacitor/core'
 import BottomNav from './components/BottomNav'
 import Home from './screens/Home'
 import StatsHub from './screens/StatsHub'
@@ -19,9 +22,30 @@ function showNavFor(pathname) {
   return false
 }
 
+function useAndroidBackButton() {
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+    const listenerPromise = CapacitorApp.addListener('backButton', () => {
+      const idx = window.history.state?.idx ?? 0
+      if (idx > 0) {
+        navigate(-1)
+      } else if (location.pathname !== '/') {
+        navigate('/')
+      } else {
+        CapacitorApp.exitApp()
+      }
+    })
+    return () => { listenerPromise.then((listener) => listener.remove()) }
+  }, [navigate, location.pathname])
+}
+
 function Shell() {
   const { pathname } = useLocation()
   const withNav = showNavFor(pathname)
+  useAndroidBackButton()
   return (
     <div className="mx-auto min-h-screen max-w-[480px]" style={{ background: 'var(--bg)' }}>
       <div style={{ paddingBottom: withNav ? 84 : 0 }}>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useStore } from '../state/StoreContext'
 import ExerciseLibraryPicker from './ExerciseLibrary'
@@ -20,6 +20,11 @@ export default function RoutineBuilder() {
   const [checked, setChecked] = useState(new Set())
   const [pickerOpen, setPickerOpen] = useState(false)
   const [editingBlock, setEditingBlock] = useState(null)
+  const [dragId, setDragId] = useState(null)
+  const [dragY, setDragY] = useState(0)
+  const rowRefs = useRef({})
+  const dragInfo = useRef(null)
+  const suppressClickRef = useRef(false)
 
   const checkedIndices = useMemo(() => [...checked].sort((a, b) => a - b), [checked])
   const canGroup = useMemo(() => {
@@ -60,6 +65,52 @@ export default function RoutineBuilder() {
 
   function removeBlock(blockId) {
     setBlocks((prev) => prev.filter((b) => b.id !== blockId))
+  }
+
+  function handleGripPointerDown(e, block, index) {
+    if (selectMode) return
+    e.preventDefault()
+    e.stopPropagation()
+    const el = rowRefs.current[block.id]
+    if (!el) return
+    const height = el.getBoundingClientRect().height + 8
+    dragInfo.current = { id: block.id, pointerId: e.pointerId, startY: e.clientY, startIndex: index, currentIndex: index, height, el }
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
+    if (navigator.vibrate) navigator.vibrate(10)
+    setDragId(block.id)
+    setDragY(0)
+  }
+
+  function handleGripPointerMove(e) {
+    const info = dragInfo.current
+    if (!info || info.pointerId !== e.pointerId) return
+    e.preventDefault()
+    const delta = e.clientY - info.startY
+    const shift = Math.round(delta / info.height)
+    const targetIndex = Math.min(blocks.length - 1, Math.max(0, info.startIndex + shift))
+    // Compensate for the row's already-applied DOM shift so the transform
+    // only carries the leftover distance to the finger, keeping it snapped
+    // under the pointer instead of jumping on every swap.
+    setDragY(delta - (targetIndex - info.startIndex) * info.height)
+    if (targetIndex !== info.currentIndex) {
+      setBlocks((prev) => {
+        const next = [...prev]
+        const [moved] = next.splice(info.currentIndex, 1)
+        next.splice(targetIndex, 0, moved)
+        return next
+      })
+      info.currentIndex = targetIndex
+    }
+  }
+
+  function handleGripPointerUp() {
+    const info = dragInfo.current
+    if (!info) return
+    suppressClickRef.current = true
+    setTimeout(() => { suppressClickRef.current = false }, 300)
+    dragInfo.current = null
+    setDragId(null)
+    setDragY(0)
   }
 
   function addExercise(exerciseId) {
@@ -120,11 +171,17 @@ export default function RoutineBuilder() {
         {blocks.map((block, i) => (
           <BlockRow
             key={block.id}
+            setRowRef={(el) => { rowRefs.current[block.id] = el }}
             block={block}
             selectMode={selectMode}
             checked={checked.has(i)}
+            dragging={dragId === block.id}
+            dragY={dragId === block.id ? dragY : 0}
+            onGripPointerDown={(e) => handleGripPointerDown(e, block, i)}
+            onGripPointerMove={handleGripPointerMove}
+            onGripPointerUp={handleGripPointerUp}
             onToggle={() => toggleChecked(i)}
-            onEdit={() => setEditingBlock(block)}
+            onEdit={() => { if (suppressClickRef.current) return; setEditingBlock(block) }}
             onUngroup={() => ungroup(block.id)}
             onRemove={() => removeBlock(block.id)}
           />
@@ -161,15 +218,46 @@ export default function RoutineBuilder() {
   )
 }
 
-function BlockRow({ block, selectMode, checked, onToggle, onEdit, onUngroup, onRemove }) {
+function BlockRow({
+  block, selectMode, checked, dragging, dragY,
+  setRowRef, onGripPointerDown, onGripPointerMove, onGripPointerUp,
+  onToggle, onEdit, onUngroup, onRemove,
+}) {
   const names = block.exerciseIds.map((id) => exerciseById(id)?.name || id).join(' + ')
   const [menuOpen, setMenuOpen] = useState(false)
   return (
-    <div className="relative flex items-center gap-2.5 rounded-[14px] border p-3" style={{ background: 'var(--surface)', borderColor: block.type === 'superset' ? 'var(--accent)' : 'var(--border)' }}>
+    <div
+      ref={setRowRef}
+      className="relative flex items-center gap-2.5 rounded-[14px] border p-3"
+      style={{
+        background: 'var(--surface)',
+        borderColor: block.type === 'superset' ? 'var(--accent)' : 'var(--border)',
+        transform: dragging ? `translateY(${dragY}px) scale(1.02)` : undefined,
+        boxShadow: dragging ? '0 8px 20px rgba(0,0,0,0.18)' : undefined,
+        zIndex: dragging ? 20 : undefined,
+        opacity: dragging ? 0.96 : 1,
+        transition: dragging ? 'none' : 'transform 120ms ease',
+        touchAction: dragging ? 'none' : undefined,
+      }}
+    >
       {selectMode && (
         <button onClick={onToggle} className="h-5 w-5 shrink-0 rounded-md border" style={{ borderColor: 'var(--border)', background: checked ? 'var(--accent)' : 'transparent' }} />
       )}
-      <GripIcon size={14} style={{ color: 'var(--muted)' }} className="shrink-0" />
+      {!selectMode ? (
+        <button
+          onPointerDown={onGripPointerDown}
+          onPointerMove={onGripPointerMove}
+          onPointerUp={onGripPointerUp}
+          onPointerCancel={onGripPointerUp}
+          className="shrink-0 cursor-grab touch-none p-1 active:cursor-grabbing"
+          style={{ color: 'var(--muted)', touchAction: 'none' }}
+          aria-label="Drag to reorder"
+        >
+          <GripIcon size={14} />
+        </button>
+      ) : (
+        <GripIcon size={14} style={{ color: 'var(--muted)' }} className="shrink-0" />
+      )}
       <div onClick={() => !selectMode && onEdit()} className="min-w-0 flex-1 cursor-pointer">
         <div className="text-sm font-semibold">{names}</div>
         <div className="mt-0.5 text-[11.5px]" style={{ color: 'var(--muted)' }}>{blockTarget(block)} reps · {block.rest}s rest{block.rir != null ? ` · ${block.rir} RIR` : ''}</div>

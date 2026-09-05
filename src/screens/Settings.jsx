@@ -95,7 +95,7 @@ export default function Settings() {
         confirmLabel="Delete everything"
         danger
         onCancel={() => setConfirmDelete(false)}
-        onConfirm={() => dispatch({ type: 'DELETE_ALL_DATA' })}
+        onConfirm={() => { dispatch({ type: 'DELETE_ALL_DATA' }); setConfirmDelete(false) }}
       />
     </div>
   )
