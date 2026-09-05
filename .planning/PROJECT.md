@@ -41,6 +41,7 @@ Logging a workout mid-session — weight, reps, RIR, rest — must be fast, reli
 - App is fully offline/local-only: state persists to `localStorage` (`src/state/storage.js`), no backend, no auth, no external APIs
 - This session already fixed two live bugs pre-dating this plan: the Settings "Delete all data" confirmation sheet not closing, and Android back-gesture exiting the app instead of navigating — both committed already
 - User is testing on a real Android device via `npx cap sync android` + `gradlew.bat installDebug` from `android/`, on Windows/WSL
+- Phase 3 interaction audit (QA-01/QA-02) deferred one finding rather than fixing it: `RoutineBuilder.jsx`'s drag-to-reorder gesture has no `visibilitychange`/`blur` safeguard against an interrupted drag (analogous to the Phase 1 hold-to-confirm backgrounding fix, CR-01), so an app-backgrounding event mid-drag could theoretically leave `dragId`/`dragY` in a stuck visual state until the next pointer event. Deferred because: (1) `onPointerCancel` already covers the overwhelming majority of real interruption cases, (2) reordering is non-destructive and fully reversible (unlike the delete gesture CR-01 protected), and (3) no data loss is possible either way — worst case is a cosmetic stuck drag-shadow correctable by any subsequent tap.
 
 ## Constraints
 
