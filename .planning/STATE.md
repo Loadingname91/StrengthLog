@@ -5,10 +5,10 @@ milestone_name: Smart Set Flow
 current_phase: 5
 current_phase_name: Fast Set Entry
 status: planning
-stopped_at: Phase 5 and 6 CONTEXT captured; ready for UI-SPEC/planning
-last_updated: "2026-09-05T11:00:00.000Z"
+stopped_at: Phase 5 planned and ready to execute; Phase 6 UI-SPEC written, pending sign-off
+last_updated: "2026-09-05T11:20:00.000Z"
 last_activity: 2026-09-05
-last_activity_desc: v1.0 shipped and closed; v1.1 "Smart Set Flow" opened — discussion completed (fast entry, structured rest rows, superset auto-advance), Phases 5-6 CONTEXT.md written, REQUIREMENTS.md/ROADMAP.md updated
+last_activity_desc: User reviewed and approved the Phase 5/6 context (rendered as an artifact); chose to plan Phase 5 directly and UI-SPEC Phase 6 first. 05-01-PLAN.md written (ready to execute). 06-UI-SPEC.md written, resolving the sequence editor and merged-superset card design — pending sign-off before 06-01/06-02-PLAN.md.
 progress:
   total_phases: 6
   completed_phases: 4
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 ## Current Position
 
 Milestone: v1.1 — Smart Set Flow
-Phase: 5 of 6 overall (1 of 2 in this milestone) — Fast Set Entry
-Plan: Not yet planned (context captured; ready for UI-SPEC then task-level PLAN.md)
-Status: Planning
-Last activity: 2026-09-05 — Discussion completed via user Q&A (rest-set shape, superset auto-advance, input auto-progress all decided); Phase 5 (Fast Set Entry) and Phase 6 (Structured Sets — Rest Rows & Superset Merge, 2 plans) CONTEXT.md + DISCUSSION-LOG.md written; REQUIREMENTS.md and ROADMAP.md updated with 11 new requirements
+Phase: 5 of 6 overall (1 of 2 in this milestone) — Fast Set Entry, planned and ready to execute
+Plan: 05-01-PLAN.md written (not yet executed)
+Status: Planning (Phase 5 ready to execute; Phase 6 UI-SPEC pending sign-off)
+Last activity: 2026-09-05 — User reviewed Phase 5/6 context via a rendered artifact and approved it, then chose sequencing: Phase 5 straight to plan, Phase 6 gets UI-SPEC first. 05-01-PLAN.md written. 06-UI-SPEC.md written, resolving the sequence editor (Routine Builder) and merged-superset card (Active Workout) designs — including the key insight that superset auto-advance is Phase 5's focus-chain extended across exercises, not a separate navigation mechanism.
 
 Progress: [███████░░░] 67% (4/6 phases — v1.0 complete, v1.1 phases 5-6 not started)
 
@@ -102,6 +102,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-05T11:00:00.000Z
-Stopped at: v1.1 Phases 5-6 context captured, ready for UI-SPEC/planning
-Resume file: .planning/phases/06-structured-sets/06-CONTEXT.md (larger/riskier of the two — read first)
+Last session: 2026-09-05T11:20:00.000Z
+Stopped at: Phase 5 ready to execute (05-01-PLAN.md); Phase 6 UI-SPEC written, pending sign-off before 06-01/06-02-PLAN.md
+Resume file: .planning/phases/05-fast-set-entry/05-01-PLAN.md (execute this first) then .planning/phases/06-structured-sets/06-UI-SPEC.md (get sign-off, then plan 06-01/06-02)

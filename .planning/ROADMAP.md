@@ -160,8 +160,10 @@ separate phases (see Phase 1 and Phase 2).
   3. Confirming a value in the reps field moves focus to the next set's weight field; on the last set of the current exercise, it blurs instead of focusing nothing useful.
   4. Once both weight and reps hold valid values for a not-yet-done set, the set is automatically marked done — no separate tap on the checkmark required.
   5. The checkmark button still works as a manual toggle (override an auto-mark, or mark done without filling both fields), and editing a field after auto-completion does not un-mark the set.
-**Plans**: TBD — ready to plan (context captured, no UI-SPEC blocker; see `05-CONTEXT.md`)
-**UI hint**: yes
+**Plans**: 1 plan, written — ready to execute
+Plans:
+- [ ] 05-01-PLAN.md — Enlarged inputs, confirm-to-advance focus chain, auto-mark-done (ENTRY-01, ENTRY-02, ENTRY-03)
+**UI hint**: yes — resolved inline in `05-CONTEXT.md` (no separate UI-SPEC needed; scope was narrow enough to decide directly)
 
 ### Phase 6: Structured Sets — Rest Rows & Superset Merge
 **Goal**: A block's set sequence — including rest — is something the user authors and sees explicitly, and a merged superset actually alternates in Active Workout instead of requiring manual tab-switching.
@@ -176,15 +178,15 @@ separate phases (see Phase 1 and Phase 2).
   5. In Active Workout, rest appears as an explicit row in the set list (in addition to/replacing the existing bottom sticky timer for the equivalent moment), reflecting the authored sequence rather than a single implicit per-block number.
   6. In Active Workout, completing a set within a merged superset automatically advances to the next exercise in the round — no manual tab tap required to follow the intended alternating flow.
   7. A merged superset renders as one interleaved view in Active Workout (both exercises' current position visible together), not two separate per-exercise tabs requiring manual switching.
-**Plans**: 2 plans (ready to plan — context captured; see `06-CONTEXT.md`)
+**Plans**: 2 plans, TBD — UI-SPEC done, task-level plans not yet written
 Plans:
 - [ ] 06-01-PLAN.md — Data model (`sequence` field + backfill) and Routine Builder authoring UI (REST-01..04, SUPER-01)
 - [ ] 06-02-PLAN.md — Active Workout runtime: rest rows in the set list, superset auto-advance and merged rendering (REST-05, SUPER-02, SUPER-03)
-**UI hint**: yes
+**UI hint**: yes — `06-UI-SPEC.md` written (sequence editor design, merged-superset card, rest-row states); pending sign-off before task-level planning
 
 ## Progress (v1.1 — Smart Set Flow)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 5. Fast Set Entry | 0/TBD | Context captured | - |
-| 6. Structured Sets — Rest Rows & Superset Merge | 0/2 | Context captured | - |
+| 5. Fast Set Entry | 0/1 | Planned — ready to execute | - |
+| 6. Structured Sets — Rest Rows & Superset Merge | 0/2 | UI-SPEC done, pending sign-off | - |
