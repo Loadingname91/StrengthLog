@@ -178,15 +178,15 @@ Plans:
   5. In Active Workout, rest appears as an explicit row in the set list (in addition to/replacing the existing bottom sticky timer for the equivalent moment), reflecting the authored sequence rather than a single implicit per-block number.
   6. In Active Workout, completing a set within a merged superset automatically advances to the next exercise in the round — no manual tab tap required to follow the intended alternating flow.
   7. A merged superset renders as one interleaved view in Active Workout (both exercises' current position visible together), not two separate per-exercise tabs requiring manual switching.
-**Plans**: 2 plans, TBD — UI-SPEC done, task-level plans not yet written
+**Plans**: 2 plans, written — ready to execute (06-02 depends on 06-01)
 Plans:
 - [ ] 06-01-PLAN.md — Data model (`sequence` field + backfill) and Routine Builder authoring UI (REST-01..04, SUPER-01)
 - [ ] 06-02-PLAN.md — Active Workout runtime: rest rows in the set list, superset auto-advance and merged rendering (REST-05, SUPER-02, SUPER-03)
-**UI hint**: yes — `06-UI-SPEC.md` written (sequence editor design, merged-superset card, rest-row states); pending sign-off before task-level planning
+**UI hint**: yes — `06-UI-SPEC.md` written and signed off (sequence editor design, merged-superset card, rest-row states)
 
 ## Progress (v1.1 — Smart Set Flow)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 5. Fast Set Entry | 0/1 | Planned — ready to execute | - |
-| 6. Structured Sets — Rest Rows & Superset Merge | 0/2 | UI-SPEC done, pending sign-off | - |
+| 6. Structured Sets — Rest Rows & Superset Merge | 0/2 | Planned — ready to execute | - |

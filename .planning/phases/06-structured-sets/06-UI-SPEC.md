@@ -58,7 +58,7 @@ Existing type scale, reused as-is — no new sizes:
 |------|------|--------|-------------|-------|
 | Exercise/pair name | 19px (`text-[19px]`), `.font-serif` | 600 (semibold) | 1.2 | Merged card header: both exercise names, unchanged size from today's single-exercise header |
 | Set/round row label | 13px (`text-[13px]`) | 700 (bold, `font-bold`) | 1.3 | "Set 1"/"Round 1" ordinal label — matches today's existing set-number styling exactly |
-| Exercise-name-within-round label | 11.5px (`text-[11.5px]`) | 600 | 1.3 | New: identifies which exercise a round's row belongs to (e.g. "Bench Press") — sits where today's "Last" ghost-value column sits for single-exercise rows, since a merged row needs the name where a single row doesn't |
+| Exercise-name-within-round label | 12px (`text-xs`) | 600 | 1.3 | New: identifies which exercise a round's row belongs to (e.g. "Bench Press") — sits where today's "Last" ghost-value column sits for single-exercise rows (which itself is `text-xs`, confirmed against `SetRow` line 268), since a merged row needs the name where a single row doesn't |
 | Rest row label | 12px (`text-xs`) | 600 | 1.3 | "Rest — 90s" inline row text |
 | Sequence editor row label | 13px (`text-sm`) | 600 | 1.4 | Routine Builder's set/round/rest row labels |
 
@@ -88,7 +88,7 @@ Existing token palette (`src/index.css`), reused for everything except one addit
 **Layout:** where today's grid has a "Sets" numeric input (top-left of the 2x2 grid in `BlockEditSheet`), it's replaced by a `Field label="Sequence"` spanning the full width, containing an ordered vertical list:
 
 - **Set/round row:** a compact row, `flex items-center justify-between`, height ~32px: left side shows the ordinal label ("Set 1", "Set 2", ... for `type: 'single'`; "Round 1", "Round 2", ... for `type: 'superset'`) in the existing bold-13px set-number style; right side shows a remove `×` (`var(--danger)`, `text-lg`, matching `RoutineBuilder.jsx`'s existing menu "Remove" styling) — hidden/disabled when this is the sequence's only remaining set/round (mirrors the existing "can't remove the last set" guard, D-08).
-- **Rest row:** same row height, dashed border (`border-dashed`, `var(--border)`), `var(--surface-alt)` background, rounded `rounded-lg`: a small clock glyph (reuse `ClockIcon` from `src/components/Icons.jsx`, already used by `SessionBar`) + a numeric `<input type="number">` (width `w-14`, matching the existing "Default rest (sec)" input in `Settings.jsx`) + "sec" label, right-aligned `×` remove control.
+- **Rest row:** same row height, dashed border (`border-dashed`, `var(--border)`), `var(--surface-alt)` background, rounded `rounded-lg`: a small clock glyph (reuse `ClockIcon` from `src/components/Icons.jsx`, already used by `SessionBar`) + a numeric `<input type="number">` (`w-20 text-sm text-right`, matching the exact classes of the existing "Default rest (sec)" input in `Settings.jsx` line 52) + "sec" label, right-aligned `×` remove control.
 - **No-rest gap:** where two set/round rows are adjacent with no rest step between them, render a thin `+ Add rest` ghost link (`text-xs`, `var(--accent-dark)`, no border/background — a tap target, not a visible row) in the gap. Tapping it inserts a `{type:'rest', seconds: state.settings.restDefault}` step there.
 - **"+ Add Set" button** (renamed from today's implicit behavior, same visual treatment as the existing dashed "+ Add Exercise" button elsewhere in this screen): appends one new set/round step AND a rest step after it (defaulting to `state.settings.restDefault`, per REST-03) — the rest step then appears as a normal removable row, per D-07.
 
@@ -160,11 +160,23 @@ Not applicable — no shadcn, no component registry used this phase.
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+Verified inline (no separate checker subagent for this project) against the
+actual current source rather than assumed values — two inaccuracies were
+found and fixed during this pass: the exercise-name-within-round label was
+specified at an invented 11.5px, corrected to the `text-xs` (12px) the
+existing "Last" ghost column actually uses (`SetRow`, `ActiveWorkout.jsx`
+line 268); the rest-row seconds input was specified at an invented `w-14`,
+corrected to the exact `w-20 text-sm text-right` classes `Settings.jsx`'s
+"Default rest (sec)" input actually uses (line 52). All other referenced
+existing patterns (`ClockIcon`, the `border-dashed` "+ Add Exercise"
+convention, the `var(--danger)` "Remove" color) were confirmed against
+source and are accurate as written.
 
-**Approval:** pending
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS (2 values corrected against source during this pass)
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS (not applicable — no registry)
+
+**Approval:** signed off 2026-09-05 — ready for task-level planning (06-01-PLAN.md, 06-02-PLAN.md)
