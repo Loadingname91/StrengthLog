@@ -1,5 +1,6 @@
 import { EXERCISES } from './exercises'
 import { uid } from './id'
+import { localISODate } from './format'
 
 function slug(name) {
   return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
@@ -77,7 +78,7 @@ export function finalizeImport(candidates, unit, includeFlagged) {
 
   const byDate = new Map()
   for (const c of usableComplete) {
-    const date = c.date || new Date().toISOString().slice(0, 10)
+    const date = c.date || localISODate()
     if (!byDate.has(date)) byDate.set(date, new Map())
     const byExercise = byDate.get(date)
     const exId = idFor(c)

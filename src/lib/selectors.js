@@ -1,18 +1,18 @@
 import { exerciseById } from './exercises'
-import { startOfWeek, startOfMonth, daysAgo } from './format'
+import { startOfWeek, startOfMonth, daysAgo, localISODate } from './format'
 
 export function allSets(session) {
   return session.entries.flatMap((e) => e.sets.map((s) => ({ ...s, exerciseId: e.exerciseId })))
 }
 
 export function sessionsSince(sessions, sinceDate) {
-  const since = sinceDate.toISOString().slice(0, 10)
+  const since = localISODate(sinceDate)
   return sessions.filter((s) => s.date >= since)
 }
 
 export function sessionsInRange(sessions, fromDate, toDate) {
-  const from = fromDate.toISOString().slice(0, 10)
-  const to = toDate.toISOString().slice(0, 10)
+  const from = localISODate(fromDate)
+  const to = localISODate(toDate)
   return sessions.filter((s) => s.date >= from && s.date <= to)
 }
 
@@ -70,7 +70,7 @@ export function chartSeries(sessions, metric, days, exerciseId) {
   const out = []
   for (let i = 0; i < days; i++) {
     const d = daysAgo(days - 1 - i)
-    const iso = d.toISOString().slice(0, 10)
+    const iso = localISODate(d)
     const daySessions = inRange.filter((s) => s.date === iso)
     let value = 0
     if (metric === 'workouts') value = daySessions.length

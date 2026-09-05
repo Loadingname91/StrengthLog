@@ -4,7 +4,7 @@ import { useStore } from '../state/StoreContext'
 import Card from '../components/Card'
 import LineChart from '../components/LineChart'
 import { BackIcon, TrashIcon } from '../components/Icons'
-import { fmtDate, todayISO } from '../lib/format'
+import { fmtDate, todayISO, daysAgo, localISODate } from '../lib/format'
 
 const METRICS = [
   { key: 'bodyweight', label: 'Bodyweight (kg)' },
@@ -28,7 +28,7 @@ export default function Measurements() {
 
   const sorted = [...state.measurements].sort((a, b) => a.date.localeCompare(b.date))
   const latest = sorted[sorted.length - 1]
-  const eightWeeksAgo = sorted.find((m) => m.date >= new Date(Date.now() - 56 * 86400000).toISOString().slice(0, 10))
+  const eightWeeksAgo = sorted.find((m) => m.date >= localISODate(daysAgo(56)))
   const waistDelta = latest && eightWeeksAgo && latest.waist != null && eightWeeksAgo.waist != null
     ? Math.round((latest.waist - eightWeeksAgo.waist) * 10) / 10
     : null

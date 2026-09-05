@@ -9,8 +9,9 @@ import BodyHeatmap from '../components/BodyHeatmap'
 import { CalendarIcon } from '../components/Icons'
 import { goalProgress, chartSeries, muscleSetCounts, sessionsSince, exerciseSetCounts } from '../lib/selectors'
 import { regionIntensities } from '../lib/muscles'
-import { daysAgo } from '../lib/format'
+import { daysAgo, todayISO } from '../lib/format'
 import { exerciseById } from '../lib/exercises'
+import { dueInfo, weekdayName } from '../lib/schedule'
 
 export default function Home() {
   const { state, dispatch } = useStore()
@@ -25,6 +26,10 @@ export default function Home() {
   const preview = nextRoutine
     ? nextRoutine.blocks.flatMap((b) => b.exerciseIds).slice(0, 3).map((id) => exerciseById(id)?.name).filter(Boolean).join(', ')
     : ''
+
+  const schedule = state.routineMode === 'weekday' && nextRoutine
+    ? dueInfo(nextRoutine.id, state.weekdayAssignments, state.sessions, state.scheduleRestartAt, state.createdAt)
+    : null
 
   const topExercises = useMemo(() => {
     const counts = exerciseSetCounts(state.sessions)
@@ -66,8 +71,25 @@ export default function Home() {
       {nextRoutine && (
         <div className="px-5 pt-4">
           <Card onClick={() => navigate(`/routines/${nextRoutine.id}`)}>
-            <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--accent)' }}>
-              Next up · {nextRoutine.position}
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--accent)' }}>
+                Next up · {nextRoutine.position}
+              </div>
+              {schedule && (
+                <span
+                  className="shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold"
+                  style={{
+                    background: schedule.isOverdue ? 'var(--danger)' : schedule.isToday ? 'var(--accent-light)' : 'var(--surface-alt)',
+                    color: schedule.isOverdue ? '#fff' : schedule.isToday ? 'var(--accent-dark)' : 'var(--muted)',
+                  }}
+                >
+                  {schedule.isOverdue
+                    ? `Overdue since ${weekdayName(schedule.weekday, true)}`
+                    : schedule.isToday
+                      ? 'Due today'
+                      : `Due ${weekdayName(schedule.weekday, true)}`}
+                </span>
+              )}
             </div>
             <div className="font-serif mt-1 text-[22px] font-semibold">{nextRoutine.name}</div>
             <div className="mt-1 text-[13px]" style={{ color: 'var(--muted)' }}>{preview}</div>
@@ -78,6 +100,15 @@ export default function Home() {
             >
               Start Workout
             </button>
+            {schedule?.isOverdue && (
+              <button
+                onClick={(e) => { e.stopPropagation(); dispatch({ type: 'RESTART_SCHEDULE' }) }}
+                className="mt-2 w-full text-center text-xs font-semibold"
+                style={{ color: 'var(--accent-dark)' }}
+              >
+                Restart schedule from today instead of catching up
+              </button>
+            )}
           </Card>
         </div>
       )}

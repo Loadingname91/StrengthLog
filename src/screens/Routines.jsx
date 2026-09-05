@@ -4,9 +4,11 @@ import { useStore } from '../state/StoreContext'
 import Card from '../components/Card'
 import ConfirmSheet from '../components/ConfirmSheet'
 import SegmentedControl from '../components/SegmentedControl'
+import WeekStrip from '../components/WeekStrip'
 import { GripIcon, ChevronRightIcon, EditIcon, TrashIcon } from '../components/Icons'
 import { exerciseById } from '../lib/exercises'
 import { uid } from '../lib/id'
+import { weekdayName } from '../lib/schedule'
 
 function estimateDuration(routine) {
   const seconds = routine.blocks.reduce((sum, b) => sum + b.sets * (50 + b.rest), 0)
@@ -18,6 +20,7 @@ export default function Routines() {
   const navigate = useNavigate()
   const [menuFor, setMenuFor] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [editingSchedule, setEditingSchedule] = useState(false)
 
   const ordered = state.routineOrder.map((id) => state.routines.find((r) => r.id === id)).filter(Boolean)
 
@@ -51,6 +54,19 @@ export default function Routines() {
           options={[{ value: 'sequence', label: 'Sequence' }, { value: 'weekday', label: 'Weekday' }]}
         />
       </div>
+
+      {state.routineMode === 'weekday' && (
+        <div className="px-5 pb-1 pt-1">
+          <WeekStrip weekdayAssignments={state.weekdayAssignments} sessions={state.sessions} routines={state.routines} />
+          <button
+            onClick={() => setEditingSchedule(true)}
+            className="mt-2 text-xs font-semibold"
+            style={{ color: 'var(--accent-dark)' }}
+          >
+            Edit schedule
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col gap-3 px-5 pt-2">
         {ordered.map((routine, i) => {
@@ -116,6 +132,53 @@ export default function Routines() {
         onCancel={() => setDeleteTarget(null)}
         onConfirm={() => { dispatch({ type: 'DELETE_ROUTINE', payload: deleteTarget }); setDeleteTarget(null) }}
       />
+
+      {editingSchedule && <ScheduleEditSheet onClose={() => setEditingSchedule(false)} />}
+    </div>
+  )
+}
+
+const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0] // Mon..Sun
+
+function ScheduleEditSheet({ onClose }) {
+  const { state, dispatch } = useStore()
+  const ordered = state.routineOrder.map((id) => state.routines.find((r) => r.id === id)).filter(Boolean)
+
+  function setWeekday(routineId, weekday) {
+    dispatch({ type: 'SET_WEEKDAY_ASSIGNMENT', payload: { routineId, weekday } })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onClose}>
+      <div
+        className="fade-in mx-auto w-full max-w-[480px] rounded-t-[24px] p-5"
+        style={{ background: 'var(--surface)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="font-serif text-lg font-semibold">Weekly schedule</div>
+        <div className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+          Assign each routine a preferred day. Skipped days push forward automatically.
+        </div>
+        <div className="mt-3 flex max-h-[50vh] flex-col gap-2 overflow-auto">
+          {ordered.map((routine) => (
+            <div key={routine.id} className="flex items-center justify-between gap-2 rounded-xl border p-2.5" style={{ borderColor: 'var(--border)' }}>
+              <span className="text-sm font-semibold">{routine.name}</span>
+              <select
+                value={state.weekdayAssignments[routine.id] ?? ''}
+                onChange={(e) => setWeekday(routine.id, e.target.value === '' ? null : Number(e.target.value))}
+                className="rounded-lg border px-2 py-1.5 text-xs"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <option value="">No fixed day</option>
+                {WEEKDAY_ORDER.map((d) => <option key={d} value={d}>{weekdayName(d)}</option>)}
+              </select>
+            </div>
+          ))}
+        </div>
+        <button onClick={onClose} className="mt-4 w-full rounded-2xl py-3 text-sm font-semibold text-white" style={{ background: 'var(--accent)' }}>
+          Done
+        </button>
+      </div>
     </div>
   )
 }

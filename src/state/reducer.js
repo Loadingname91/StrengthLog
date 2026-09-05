@@ -1,5 +1,5 @@
 import { EXERCISES } from '../lib/exercises'
-import { blockTarget } from '../lib/format'
+import { blockTarget, todayISO, localISODate } from '../lib/format'
 import { bestProductForExercise, totalVolume } from '../lib/selectors'
 import { uid } from '../lib/id'
 
@@ -61,7 +61,10 @@ export function reducer(state, action) {
     case 'ADD_ROUTINE': {
       const routine = { ...action.payload, id: action.payload.id || uid('routine') }
       const routines = [...state.routines, routine]
-      return { ...state, routines, routineOrder: [...state.routineOrder, routine.id] }
+      const taken = new Set(Object.values(state.weekdayAssignments))
+      const freeWeekday = [1, 2, 3, 4, 5, 6, 0].find((d) => !taken.has(d))
+      const weekdayAssignments = freeWeekday == null ? state.weekdayAssignments : { ...state.weekdayAssignments, [routine.id]: freeWeekday }
+      return { ...state, routines, routineOrder: [...state.routineOrder, routine.id], weekdayAssignments }
     }
 
     case 'UPDATE_ROUTINE': {
@@ -72,11 +75,23 @@ export function reducer(state, action) {
     case 'DELETE_ROUTINE': {
       const routines = state.routines.filter((r) => r.id !== action.payload)
       const routineOrder = state.routineOrder.filter((id) => id !== action.payload)
-      return { ...state, routines, routineOrder }
+      const weekdayAssignments = { ...state.weekdayAssignments }
+      delete weekdayAssignments[action.payload]
+      return { ...state, routines, routineOrder, weekdayAssignments }
     }
 
     case 'REORDER_ROUTINES':
       return { ...state, routineOrder: action.payload }
+
+    case 'SET_WEEKDAY_ASSIGNMENT': {
+      const weekdayAssignments = { ...state.weekdayAssignments }
+      if (action.payload.weekday == null) delete weekdayAssignments[action.payload.routineId]
+      else weekdayAssignments[action.payload.routineId] = action.payload.weekday
+      return { ...state, weekdayAssignments }
+    }
+
+    case 'RESTART_SCHEDULE':
+      return { ...state, scheduleRestartAt: todayISO() }
 
     case 'ADD_GOAL':
       return { ...state, goals: [...state.goals, { ...action.payload, id: uid('goal') }] }
@@ -197,7 +212,7 @@ export function reducer(state, action) {
         id: aw.id,
         routineId: aw.routineId,
         routineName: aw.routineName,
-        date: aw.startedAt.slice(0, 10),
+        date: localISODate(new Date(aw.startedAt)),
         startedAt: aw.startedAt,
         finishedAt,
         durationSec,

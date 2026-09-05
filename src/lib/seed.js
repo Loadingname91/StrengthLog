@@ -1,5 +1,6 @@
 import { mulberry32 } from './rng'
-import { todayISO } from './format'
+import { todayISO, localISODate } from './format'
+import { defaultWeekdayAssignments } from './schedule'
 
 // ---- Routines -------------------------------------------------------
 
@@ -174,7 +175,7 @@ export function buildSessions(routines) {
       id: nextId('session'),
       routineId: routine.id,
       routineName: routine.name,
-      date: startedAt.toISOString().slice(0, 10),
+      date: localISODate(startedAt),
       startedAt: startedAt.toISOString(),
       finishedAt: finishedAt.toISOString(),
       durationSec,
@@ -199,7 +200,7 @@ export function buildMeasurements() {
     date.setDate(date.getDate() - w * 7)
     out.push({
       id: nextId('measure'),
-      date: date.toISOString().slice(0, 10),
+      date: localISODate(date),
       bodyweight: Math.round((82 - w * 0.15 + range(rand, -0.4, 0.4)) * 10) / 10,
       waist: Math.round((91 - w * 0.2 + range(rand, -0.3, 0.3)) * 10) / 10,
       chest: Math.round((104 + w * 0.05 + range(rand, -0.3, 0.3)) * 10) / 10,
@@ -231,6 +232,8 @@ export function buildSeed() {
     routineOrder,
     sequenceIndex: nextSeqIndex,
     routineMode: 'sequence',
+    weekdayAssignments: defaultWeekdayAssignments(routineOrder),
+    scheduleRestartAt: null,
     sessions: sessions.sort((a, b) => a.date.localeCompare(b.date)),
     measurements: buildMeasurements(),
     goals: buildGoals(),

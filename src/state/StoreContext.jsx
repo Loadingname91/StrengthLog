@@ -2,12 +2,18 @@ import { createContext, useContext, useEffect, useMemo, useReducer } from 'react
 import { reducer, initialSettings, allExercises } from './reducer'
 import { loadState, saveState } from './storage'
 import { buildSeed } from '../lib/seed'
+import { defaultWeekdayAssignments } from '../lib/schedule'
 
 const StoreCtx = createContext(null)
 
 function buildInitialState() {
   const persisted = loadState()
-  if (persisted) return persisted
+  if (persisted) {
+    // Backfill fields added after this state was first saved.
+    if (!persisted.weekdayAssignments) persisted.weekdayAssignments = defaultWeekdayAssignments(persisted.routineOrder)
+    if (persisted.scheduleRestartAt === undefined) persisted.scheduleRestartAt = null
+    return persisted
+  }
   return {
     settings: initialSettings(),
     user: { name: 'Marcus' },

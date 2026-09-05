@@ -1,6 +1,6 @@
 import { exerciseById } from './exercises'
 import { exerciseSetCounts, exerciseHistory, sessionsSince, sessionsInRange } from './selectors'
-import { startOfWeek, daysAgo } from './format'
+import { startOfWeek, daysAgo, localISODate } from './format'
 
 function topSet(sets) {
   return Math.max(0, ...sets.map((s) => s.weight))
@@ -18,7 +18,7 @@ export function buildInsights(sessions) {
   for (const id of trackedIds) {
     const ex = exerciseById(id)
     if (!ex) continue
-    const hist = exerciseHistory(sessions, id).filter((h) => h.date >= daysAgo(56).toISOString().slice(0, 10))
+    const hist = exerciseHistory(sessions, id).filter((h) => h.date >= localISODate(daysAgo(56)))
     if (hist.length < 3) continue
     const first = topSet(hist[0].sets)
     const last = topSet(hist[hist.length - 1].sets)

@@ -22,8 +22,19 @@ export function fmtClock(seconds) {
   return `${m}:${String(r).padStart(2, '0')}`
 }
 
+// Local calendar-day string (YYYY-MM-DD). Deliberately NOT `toISOString()`,
+// which converts to UTC and silently shifts the date near midnight in any
+// timezone behind UTC (a workout logged at 11pm local would land on
+// "tomorrow" everywhere — goals, stats, weekday schedule, CSV export).
+export function localISODate(d = new Date()) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export function todayISO() {
-  return new Date().toISOString().slice(0, 10)
+  return localISODate()
 }
 
 export function daysAgo(n) {
