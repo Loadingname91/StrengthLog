@@ -144,7 +144,7 @@ separate phases (see Phase 1 and Phase 2).
 
 ## Phases
 
-- [ ] **Phase 5: Fast Set Entry** - Weight/reps inputs are bigger and touch-friendly; confirming a field auto-advances to the next one, and a set auto-completes once both values are filled
+- [x] **Phase 5: Fast Set Entry** - Weight/reps inputs are bigger and touch-friendly; confirming a field auto-advances to the next one, and a set auto-completes once both values are filled (completed 2026-09-05)
 - [ ] **Phase 6: Structured Sets — Rest Rows & Superset Merge** - Rest becomes an explicit, editable row in a block's set sequence; merging exercises into a superset makes Active Workout auto-alternate between them with rest clustered around each full round
 
 ## Phase Details
@@ -160,9 +160,9 @@ separate phases (see Phase 1 and Phase 2).
   3. Confirming a value in the reps field moves focus to the next set's weight field; on the last set of the current exercise, it blurs instead of focusing nothing useful.
   4. Once both weight and reps hold valid values for a not-yet-done set, the set is automatically marked done — no separate tap on the checkmark required.
   5. The checkmark button still works as a manual toggle (override an auto-mark, or mark done without filling both fields), and editing a field after auto-completion does not un-mark the set.
-**Plans**: 1 plan, written — ready to execute
+**Plans**: 1/1 plans complete
 Plans:
-- [ ] 05-01-PLAN.md — Enlarged inputs, confirm-to-advance focus chain, auto-mark-done (ENTRY-01, ENTRY-02, ENTRY-03)
+- [x] 05-01-PLAN.md — Enlarged inputs, confirm-to-advance focus chain, auto-mark-done (ENTRY-01, ENTRY-02, ENTRY-03)
 **UI hint**: yes — resolved inline in `05-CONTEXT.md` (no separate UI-SPEC needed; scope was narrow enough to decide directly)
 
 ### Phase 6: Structured Sets — Rest Rows & Superset Merge
@@ -188,5 +188,5 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 5. Fast Set Entry | 0/1 | Planned — ready to execute | - |
+| 5. Fast Set Entry | 1/1 | Complete    | 2026-09-05 |
 | 6. Structured Sets — Rest Rows & Superset Merge | 0/2 | Planned — ready to execute | - |

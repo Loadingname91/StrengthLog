@@ -4,17 +4,17 @@ milestone: v1.1
 milestone_name: Smart Set Flow
 current_phase: 5
 current_phase_name: Fast Set Entry
-status: planning
-stopped_at: Phase 5 planned and ready to execute; Phase 6 UI-SPEC written, pending sign-off
-last_updated: "2026-09-05T11:20:00.000Z"
+status: executing
+stopped_at: Phase 5 complete; Phase 6 fully planned (06-01/06-02-PLAN.md written), ready to execute
+last_updated: "2026-09-05T15:00:00.000Z"
 last_activity: 2026-09-05
-last_activity_desc: User reviewed and approved the Phase 5/6 context (rendered as an artifact); chose to plan Phase 5 directly and UI-SPEC Phase 6 first. 05-01-PLAN.md written (ready to execute). 06-UI-SPEC.md written, resolving the sequence editor and merged-superset card design — pending sign-off before 06-01/06-02-PLAN.md.
+last_activity_desc: Phase 5 (Fast Set Entry) implemented, tested (64/64), browser-verified, and complete. A real bug was found and fixed during testing (a focus-shift re-entrancy double-toggle). Phase 6's UI-SPEC checker-passed and signed off; 06-01-PLAN.md and 06-02-PLAN.md written (data model + builder UI, then Active Workout runtime).
 progress:
   total_phases: 6
-  completed_phases: 4
-  total_plans: 6
-  completed_plans: 6
-  percent: 67
+  completed_phases: 5
+  total_plans: 9
+  completed_plans: 7
+  percent: 83
 ---
 
 # Project State
