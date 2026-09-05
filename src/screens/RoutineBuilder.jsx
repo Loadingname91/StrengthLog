@@ -115,7 +115,7 @@ export default function RoutineBuilder() {
 
   function addExercise(exerciseId) {
     setPickerOpen(false)
-    setEditingBlock({ id: uid('block'), type: 'single', exerciseIds: [exerciseId], sets: 3, repMin: 8, repMax: 12, rest: 90, rir: 2, isNew: true })
+    setEditingBlock({ id: uid('block'), type: 'single', exerciseIds: [exerciseId], sets: 3, repMin: 8, repMax: 12, rest: 90, rir: 2, targetWeight: null, isNew: true })
   }
 
   function saveBlockEdit(patch) {
@@ -285,6 +285,7 @@ function BlockEditSheet({ block, onCancel, onSave }) {
   const [repMax, setRepMax] = useState(block.repMax)
   const [rest, setRest] = useState(block.rest)
   const [rir, setRir] = useState(block.rir)
+  const [targetWeight, setTargetWeight] = useState(block.targetWeight ?? '')
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onCancel}>
@@ -299,8 +300,11 @@ function BlockEditSheet({ block, onCancel, onSave }) {
         <Field label="RIR target (optional)">
           <input type="number" value={rir ?? ''} onChange={(e) => setRir(e.target.value === '' ? null : Number(e.target.value))} className="w-full rounded-xl border p-2 text-sm" style={{ borderColor: 'var(--border)' }} />
         </Field>
+        <Field label="Target weight (optional)">
+          <input type="number" value={targetWeight} onChange={(e) => setTargetWeight(e.target.value)} placeholder="e.g. 60" className="w-full rounded-xl border p-2 text-sm" style={{ borderColor: 'var(--border)' }} />
+        </Field>
         <button
-          onClick={() => onSave({ sets, repMin, repMax, rest, rir })}
+          onClick={() => onSave({ sets, repMin, repMax, rest, rir, targetWeight: targetWeight === '' ? null : Number(targetWeight) })}
           className="mt-2 w-full rounded-2xl py-3 text-sm font-semibold text-white"
           style={{ background: 'var(--accent)' }}
         >
