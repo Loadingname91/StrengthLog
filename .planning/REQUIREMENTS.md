@@ -9,13 +9,13 @@ Requirements for this stabilization milestone. Each maps to a roadmap phase.
 
 ### Data
 
-- [ ] **DATA-01**: App launches with zero seeded/demo data — no fake routines, no fake session history — on a fresh install (empty `localStorage`)
-- [ ] **DATA-02**: Removing seed data does not affect any user who already has saved data — the seed path only ever ran when `localStorage` was empty
+- [x] **DATA-01**: App launches with zero seeded/demo data — no fake routines, no fake session history — on a fresh install (empty `localStorage`)
+- [x] **DATA-02**: Removing seed data does not affect any user who already has saved data — the seed path only ever ran when `localStorage` was empty
 
 ### Safety
 
-- [ ] **SAFE-01**: "Delete all data" requires a press-and-hold gesture with a visible hold-progress indicator, not a single tap, before the destructive action fires
-- [ ] **SAFE-02**: Releasing the hold before it completes cancels the action — no data loss, no partial delete
+- [x] **SAFE-01**: "Delete all data" requires a press-and-hold gesture with a visible hold-progress indicator, not a single tap, before the destructive action fires
+- [x] **SAFE-02**: Releasing the hold before it completes cancels the action — no data loss, no partial delete
 
 ### Routine Builder
 
@@ -64,10 +64,10 @@ Deferred to a future release. Tracked but not in this milestone's roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATA-01 | Phase 1 | Pending |
-| DATA-02 | Phase 1 | Pending |
-| SAFE-01 | Phase 1 | Pending |
-| SAFE-02 | Phase 1 | Pending |
+| DATA-01 | Phase 1 | Complete |
+| DATA-02 | Phase 1 | Complete |
+| SAFE-01 | Phase 1 | Complete |
+| SAFE-02 | Phase 1 | Complete |
 | SESSION-01 | Phase 2 | Pending |
 | SESSION-02 | Phase 2 | Pending |
 | SESSION-03 | Phase 2 | Pending |
@@ -82,6 +82,7 @@ Deferred to a future release. Tracked but not in this milestone's roadmap.
 | TEST-04 | Phase 4 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 16 total
 - Mapped to phases: 16
 - Unmapped: 0 ✓

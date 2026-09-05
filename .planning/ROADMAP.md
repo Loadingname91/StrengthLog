@@ -53,7 +53,11 @@ Plans:
   4. Routine Builder's exercise block editor has an optional target-weight field alongside sets/reps/rest/RIR.
   5. When a block has a target weight set and no historical "last time" data exists yet for that exercise, Active Workout's ghost/placeholder value shows the target weight instead of a blank dash.
 
-**Plans**: TBD
+**Plans**: 1/2 plans executed
+
+- [x] 02-01-PLAN.md
+- [ ] 02-02-PLAN.md
+
 **UI hint**: yes
 
 ### Phase 3: Interaction Quality Audit
@@ -92,7 +96,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Fresh Install & Safe Deletion | 2/2 | Complete   | 2026-09-05 |
-| 2. Uninterrupted Workout Sessions | 0/TBD | Not started | - |
+| 1. Fresh Install & Safe Deletion | 2/2 | Complete    | 2026-09-05 |
+| 2. Uninterrupted Workout Sessions | 1/2 | In Progress|  |
 | 3. Interaction Quality Audit | 0/TBD | Not started | - |
 | 4. Test Suite & Regression Safety Net | 0/TBD | Not started | - |
