@@ -180,7 +180,7 @@ Plans:
   7. A merged superset renders as one interleaved view in Active Workout (both exercises' current position visible together), not two separate per-exercise tabs requiring manual switching.
 **Plans**: 2 plans, written — ready to execute (06-02 depends on 06-01)
 Plans:
-- [ ] 06-01-PLAN.md — Data model (`sequence` field + backfill) and Routine Builder authoring UI (REST-01..04, SUPER-01)
+- [x] 06-01-PLAN.md — Data model (`sequence` field + backfill) and Routine Builder authoring UI (REST-01..04, SUPER-01)
 - [ ] 06-02-PLAN.md — Active Workout runtime: rest rows in the set list, superset auto-advance and merged rendering (REST-05, SUPER-02, SUPER-03)
 **UI hint**: yes — `06-UI-SPEC.md` written and signed off (sequence editor design, merged-superset card, rest-row states)
 

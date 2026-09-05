@@ -1,3 +1,5 @@
+import { sequenceSetCount } from './blocks'
+
 export function fmtDate(iso) {
   const d = new Date(iso)
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
@@ -63,6 +65,7 @@ export function round1(n) {
 }
 
 export function blockTarget(block) {
-  return `${block.sets}×${block.repMin}-${block.repMax}`
+  const sets = block.sequence ? sequenceSetCount(block.sequence) : block.sets
+  return `${sets}×${block.repMin}-${block.repMax}`
 }
 
