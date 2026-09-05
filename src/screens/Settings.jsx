@@ -20,6 +20,7 @@ export default function Settings() {
   const { state, dispatch } = useStore()
   const navigate = useNavigate()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleteGoalTarget, setDeleteGoalTarget] = useState(null)
 
   function set(patch) {
     dispatch({ type: 'SET_SETTINGS', payload: patch })
@@ -63,7 +64,7 @@ export default function Settings() {
             return (
               <div key={g.id} className="flex items-center justify-between py-2 text-sm">
                 <span>{p.label}</span>
-                <button onClick={() => dispatch({ type: 'DELETE_GOAL', payload: g.id })} style={{ color: 'var(--muted)' }}><TrashIcon size={15} /></button>
+                <button onClick={() => setDeleteGoalTarget(g.id)} style={{ color: 'var(--muted)' }}><TrashIcon size={15} /></button>
               </div>
             )
           })}
@@ -97,6 +98,16 @@ export default function Settings() {
         holdToConfirm
         onCancel={() => setConfirmDelete(false)}
         onConfirm={() => { dispatch({ type: 'DELETE_ALL_DATA' }); setConfirmDelete(false) }}
+      />
+
+      <ConfirmSheet
+        open={!!deleteGoalTarget}
+        title="Delete this goal?"
+        body="This goal will be permanently removed. Your logged workout history is unaffected."
+        confirmLabel="Delete"
+        danger
+        onCancel={() => setDeleteGoalTarget(null)}
+        onConfirm={() => { dispatch({ type: 'DELETE_GOAL', payload: deleteGoalTarget }); setDeleteGoalTarget(null) }}
       />
     </div>
   )
