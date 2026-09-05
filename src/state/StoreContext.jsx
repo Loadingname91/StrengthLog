@@ -6,7 +6,7 @@ import { defaultWeekdayAssignments } from '../lib/schedule'
 
 const StoreCtx = createContext(null)
 
-function buildInitialState() {
+export function buildInitialState() {
   const persisted = loadState()
   if (persisted) {
     // Backfill fields added after this state was first saved.
