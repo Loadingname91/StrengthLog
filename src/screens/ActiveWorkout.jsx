@@ -31,6 +31,8 @@ export default function ActiveWorkout() {
   const [prBadge, setPrBadge] = useState(null)
   const dingPlayed = useRef(false)
   const finishingRef = useRef(false)
+  const weightRefs = useRef({})
+  const repsRefs = useRef({})
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000)
@@ -173,6 +175,15 @@ export default function ActiveWorkout() {
                 ghost={ghostSets?.[si]}
                 targetWeight={current.targetWeight}
                 showRIR={state.settings.showRIR}
+                isLastSet={si === current.sets.length - 1}
+                registerWeightRef={(el) => { weightRefs.current[si] = el }}
+                registerRepsRef={(el) => { repsRefs.current[si] = el }}
+                focusReps={() => repsRefs.current[si]?.focus()}
+                focusNextWeightOrBlur={() => {
+                  const next = weightRefs.current[si + 1]
+                  if (next) next.focus()
+                  else repsRefs.current[si]?.blur()
+                }}
               />
             ))}
 
@@ -242,7 +253,10 @@ export default function ActiveWorkout() {
   )
 }
 
-function SetRow({ exerciseIndex, setIndex, set, ghost, targetWeight, showRIR }) {
+function SetRow({
+  exerciseIndex, setIndex, set, ghost, targetWeight, showRIR, isLastSet,
+  registerWeightRef, registerRepsRef, focusReps, focusNextWeightOrBlur,
+}) {
   const { dispatch } = useStore()
 
   function setField(field, value) {
@@ -260,6 +274,56 @@ function SetRow({ exerciseIndex, setIndex, set, ghost, targetWeight, showRIR }) 
     requestAnimationFrame(() => inputEl?.select())
   }
 
+  // Dispatches the same TOGGLE_SET_DONE the checkmark button uses, once both
+  // fields hold a valid value — the exact validity check reducer.js already
+  // applies for PR detection. Fires only from a confirm action (below), never
+  // mid-keystroke, and never un-marks a set (that stays a manual tap).
+  function maybeAutoMarkDone() {
+    if (set.done) return
+    const weight = parseFloat(set.weight)
+    const reps = parseInt(set.reps, 10)
+    if (Number.isFinite(weight) && Number.isFinite(reps) && weight > 0 && reps > 0) {
+      dispatch({ type: 'TOGGLE_SET_DONE', payload: { exerciseIndex, setIndex } })
+    }
+  }
+
+  // Shifting focus to the next field for real (below) fires a genuine
+  // native blur on the field currently losing focus once it actually held
+  // focus — which re-enters this same confirm handler synchronously before
+  // the outer call returns. Without a guard, that second entry would
+  // re-dispatch TOGGLE_SET_DONE and cancel the first dispatch out (an
+  // immediate re-toggle back to not-done). confirmingRef makes the confirm
+  // sequence non-reentrant per row.
+  const confirmingRef = useRef(false)
+
+  function confirmWeight() {
+    if (confirmingRef.current || set.weight === '') return
+    confirmingRef.current = true
+    maybeAutoMarkDone()
+    focusReps()
+    confirmingRef.current = false
+  }
+
+  function confirmReps() {
+    if (confirmingRef.current || set.reps === '') return
+    confirmingRef.current = true
+    maybeAutoMarkDone()
+    focusNextWeightOrBlur()
+    confirmingRef.current = false
+  }
+
+  function onWeightKeyDown(e) {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    confirmWeight()
+  }
+
+  function onRepsKeyDown(e) {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    confirmReps()
+  }
+
   const weightPlaceholder = ghost ? String(ghost.weight) : (targetWeight != null ? String(targetWeight) : '—')
 
   return (
@@ -267,21 +331,29 @@ function SetRow({ exerciseIndex, setIndex, set, ghost, targetWeight, showRIR }) 
       <span className="tabular-nums text-[13px] font-bold" style={{ color: 'var(--muted)' }}>{setIndex + 1}</span>
       <span className="tabular-nums text-xs" style={{ color: 'var(--muted)' }}>{ghost ? `${ghost.weight}×${ghost.reps}` : '—'}</span>
       <input
+        ref={registerWeightRef}
         value={set.weight}
         onChange={(e) => setField('weight', e.target.value)}
         onFocus={(e) => fillGhost('weight', e.target)}
+        onKeyDown={onWeightKeyDown}
+        onBlur={confirmWeight}
         placeholder={weightPlaceholder}
         inputMode="decimal"
-        className="tabular-nums w-full rounded-lg border p-1.5 text-center text-[13px]"
+        enterKeyHint="next"
+        className="tabular-nums w-full rounded-xl border p-2.5 text-center text-lg font-semibold"
         style={{ borderColor: 'var(--border)', background: set.done ? 'var(--accent-light)' : 'var(--surface)' }}
       />
       <input
+        ref={registerRepsRef}
         value={set.reps}
         onChange={(e) => setField('reps', e.target.value)}
         onFocus={(e) => fillGhost('reps', e.target)}
+        onKeyDown={onRepsKeyDown}
+        onBlur={confirmReps}
         placeholder={ghost ? String(ghost.reps) : '—'}
         inputMode="numeric"
-        className="tabular-nums w-full rounded-lg border p-1.5 text-center text-[13px]"
+        enterKeyHint={isLastSet ? 'done' : 'next'}
+        className="tabular-nums w-full rounded-xl border p-2.5 text-center text-lg font-semibold"
         style={{ borderColor: 'var(--border)', background: set.done ? 'var(--accent-light)' : 'var(--surface)' }}
       />
       <button
