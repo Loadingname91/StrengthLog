@@ -91,13 +91,10 @@ None. No stubs, placeholders, or TODOs introduced by this phase's changes.
 
 **No blocking gaps found.** Phase goal achieved at the code level; two behavior-dependent truths await on-device confirmation (tracked above), consistent with this project having no test suite until Phase 4.
 
-### Non-Critical Gaps (Deferred, documented in 01-REVIEW-FIX.md)
+### Non-Critical Gaps (documented in 01-REVIEW-FIX.md)
 
-1. **WR-04: Android hardware back button has no awareness of an open ConfirmSheet**
-   - Issue: Pressing back while the delete-all sheet is open triggers route navigation instead of a clean sheet-cancel.
-   - Impact: Limited — navigation still incidentally unmounts/closes the sheet without deleting anything; no data-loss risk, just an inconsistent dismiss path.
-   - Recommendation: Defer to a dedicated phase/plan — fixing correctly requires a shared modal-stack mechanism touching `App.jsx` and every `ConfirmSheet` call site, out of proportion for this phase's two plans.
-2. **IN-01/IN-02 (Info, out of fix scope by default):** no keyboard equivalent for the hold gesture; `holdPct` naming implies granular progress but is binary. Both are pre-existing-style polish items, not correctness issues.
+1. **WR-04: Android hardware back button had no awareness of an open ConfirmSheet — RESOLVED.** Originally deferred as out-of-proportion for a one-file patch; fixed before Phase 2 started via a shared modal-stack (`src/lib/modalStack.js`) — `App.jsx`'s back-button handler now dismisses the topmost open `ConfirmSheet` before falling through to route navigation. Commit `e5b341c`.
+2. **IN-01/IN-02 (Info, out of fix scope by default):** no keyboard equivalent for the hold gesture; `holdPct` naming implies granular progress but is binary. Both are pre-existing-style polish items, not correctness issues. Still open, not blocking.
 
 ## Verification Metadata
 

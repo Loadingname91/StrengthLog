@@ -1,21 +1,24 @@
 ---
 phase: 01-fresh-install-safe-deletion
 fixed_at: 2026-09-05T08:55:00Z
+updated: 2026-09-05T09:30:00Z
 review_path: 01-REVIEW.md
 fix_scope: critical_warning
 findings_in_scope: 7
-fixed: 6
-skipped: 1
-iteration: 1
-status: partial
+fixed: 7
+skipped: 0
+iteration: 2
+status: all_fixed
 ---
 
 # Phase 01: Code Review Fix Report
 
 **Fix scope:** critical_warning (Critical + Warning findings; Info findings out of scope by default)
 **Findings in scope:** 7 (2 critical, 5 warning)
-**Fixed:** 6
-**Skipped:** 1
+**Fixed:** 7
+**Skipped:** 0
+
+> **Update (iteration 2):** WR-04, originally skipped as out-of-proportion, was addressed per explicit user request before starting Phase 2. See "Fixed" below — moved out of "Skipped".
 
 ## Fixed
 
@@ -43,10 +46,9 @@ Added `lastFinishedSession: null` to the `DELETE_ALL_DATA` reducer case (same co
 **Commit:** `fe47df7`
 Extracted `HOLD_DURATION_MS = 1500` in `ConfirmSheet.jsx` and used it for both the `setTimeout` delay and the CSS transition duration string (same commit as WR-01).
 
-## Skipped
-
 ### WR-04: Android back button has no awareness of the open destructive confirmation sheet
-**Reason:** The review itself flags this as a pre-existing architectural gap (`App.jsx`'s `useAndroidBackButton` has no concept of an open modal/sheet), not something introduced by this phase's changes. A correct fix requires a shared modal-stack mechanism across every `ConfirmSheet` call site (`Settings.jsx`, `Routines.jsx`, `ActiveWorkout.jsx`) and the global back-button handler in `App.jsx` — a cross-cutting change to core navigation behavior well beyond this phase's two plans (fresh-install empty state, hold-to-confirm gesture). Fixing it as a one-off inside `ConfirmSheet.jsx` alone (e.g. a local `backButton` listener calling `onCancel`) would not actually stop the global handler's `navigate(-1)`/`navigate('/')` from also firing, so it would not resolve the underlying issue. Deferred as a known gap for separate, deliberate design — not folded into this phase's fix pass.
+**Commit:** `e5b341c`
+Originally skipped in iteration 1 as out-of-proportion for a one-file patch (a correct fix needed a mechanism shared across every `ConfirmSheet` call site and the global back-button handler, not a local change). Addressed in iteration 2, before starting Phase 2, per explicit user request: added `src/lib/modalStack.js`, a small shared stack that `ConfirmSheet` pushes its `onCancel` onto while open; `App.jsx`'s `useAndroidBackButton` now calls `dismissTopModal()` first and returns early if a modal was open, before falling through to `navigate(-1)`/`navigate('/')`/`exitApp()`. This fixes all three `ConfirmSheet` call sites (`Settings.jsx` delete-all, `Routines.jsx` delete-routine, `ActiveWorkout.jsx` finish-anyway) without modifying any of them individually — only `ConfirmSheet.jsx` and `App.jsx` changed.
 
 ## Out of scope (Info findings, excluded from critical_warning fix scope)
 
