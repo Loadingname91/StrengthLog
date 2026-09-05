@@ -19,15 +19,15 @@ Requirements for this stabilization milestone. Each maps to a roadmap phase.
 
 ### Routine Builder
 
-- [ ] **BUILD-01**: Routine Builder's exercise block editor has an optional target-weight field alongside sets/reps/rest/RIR
-- [ ] **BUILD-02**: When a block has a target weight and no historical "last time" data exists for that exercise, Active Workout pre-fills the weight ghost value from the target weight instead of showing a blank dash
+- [x] **BUILD-01**: Routine Builder's exercise block editor has an optional target-weight field alongside sets/reps/rest/RIR
+- [x] **BUILD-02**: When a block has a target weight and no historical "last time" data exists for that exercise, Active Workout pre-fills the weight ghost value from the target weight instead of showing a blank dash
 
 ### Session Continuity
 
-- [ ] **SESSION-01**: A persistent floating bar shows "workout in progress" with a live running clock, visible on every screen (Home, Routines, Stats, Settings) while a workout is active
-- [ ] **SESSION-02**: Tapping the persistent bar navigates directly back into Active Workout at the current exercise
-- [ ] **SESSION-03**: Leaving Active Workout — via the in-app back button, bottom-nav navigation, or the Android hardware/gesture back — never discards the in-progress session; it keeps running and resumes exactly where left off
-- [ ] **SESSION-04**: The elapsed-time clock reflects real wall-clock time correctly even after the app is backgrounded and foregrounded again
+- [x] **SESSION-01**: A persistent floating bar shows "workout in progress" with a live running clock, visible on every screen (Home, Routines, Stats, Settings) while a workout is active
+- [x] **SESSION-02**: Tapping the persistent bar navigates directly back into Active Workout at the current exercise
+- [x] **SESSION-03**: Leaving Active Workout — via the in-app back button, bottom-nav navigation, or the Android hardware/gesture back — never discards the in-progress session; it keeps running and resumes exactly where left off
+- [x] **SESSION-04**: The elapsed-time clock reflects real wall-clock time correctly even after the app is backgrounded and foregrounded again
 
 ### Interaction Quality
 
@@ -68,12 +68,12 @@ Deferred to a future release. Tracked but not in this milestone's roadmap.
 | DATA-02 | Phase 1 | Complete |
 | SAFE-01 | Phase 1 | Complete |
 | SAFE-02 | Phase 1 | Complete |
-| SESSION-01 | Phase 2 | Pending |
-| SESSION-02 | Phase 2 | Pending |
-| SESSION-03 | Phase 2 | Pending |
-| SESSION-04 | Phase 2 | Pending |
-| BUILD-01 | Phase 2 | Pending |
-| BUILD-02 | Phase 2 | Pending |
+| SESSION-01 | Phase 2 | Complete |
+| SESSION-02 | Phase 2 | Complete |
+| SESSION-03 | Phase 2 | Complete |
+| SESSION-04 | Phase 2 | Complete |
+| BUILD-01 | Phase 2 | Complete |
+| BUILD-02 | Phase 2 | Complete |
 | QA-01 | Phase 3 | Pending |
 | QA-02 | Phase 3 | Pending |
 | TEST-01 | Phase 4 | Pending |

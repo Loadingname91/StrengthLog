@@ -14,7 +14,7 @@ This is a brownfield stabilization milestone on an already-working React + Vite 
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Fresh Install & Safe Deletion** - New installs start completely empty and "Delete all data" requires a deliberate press-and-hold instead of a single tap (completed 2026-09-05)
-- [ ] **Phase 2: Uninterrupted Workout Sessions** - Active workouts show correct placeholder guidance and survive navigation, backgrounding, and the hardware back button without losing the user's place
+- [x] **Phase 2: Uninterrupted Workout Sessions** - Active workouts show correct placeholder guidance and survive navigation, backgrounding, and the hardware back button without losing the user's place (completed 2026-09-05)
 - [ ] **Phase 3: Interaction Quality Audit** - Every control on every screen is manually verified to do what it claims, with defects fixed or explicitly deferred
 - [ ] **Phase 4: Test Suite & Regression Safety Net** - A Vitest + Testing Library suite covers this milestone's riskiest logic and newest features, running clean alongside lint
 
@@ -53,10 +53,10 @@ Plans:
   4. Routine Builder's exercise block editor has an optional target-weight field alongside sets/reps/rest/RIR.
   5. When a block has a target weight set and no historical "last time" data exists yet for that exercise, Active Workout's ghost/placeholder value shows the target weight instead of a blank dash.
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans complete
 
 - [x] 02-01-PLAN.md
-- [ ] 02-02-PLAN.md
+- [x] 02-02-PLAN.md
 
 **UI hint**: yes
 
@@ -97,6 +97,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Fresh Install & Safe Deletion | 2/2 | Complete    | 2026-09-05 |
-| 2. Uninterrupted Workout Sessions | 1/2 | In Progress|  |
+| 2. Uninterrupted Workout Sessions | 2/2 | Complete    | 2026-09-05 |
 | 3. Interaction Quality Audit | 0/TBD | Not started | - |
 | 4. Test Suite & Regression Safety Net | 0/TBD | Not started | - |
