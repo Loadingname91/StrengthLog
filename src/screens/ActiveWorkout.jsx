@@ -171,6 +171,7 @@ export default function ActiveWorkout() {
                 setIndex={si}
                 set={set}
                 ghost={ghostSets?.[si]}
+                targetWeight={current.targetWeight}
                 showRIR={state.settings.showRIR}
               />
             ))}
@@ -241,19 +242,25 @@ export default function ActiveWorkout() {
   )
 }
 
-function SetRow({ exerciseIndex, setIndex, set, ghost, showRIR }) {
+function SetRow({ exerciseIndex, setIndex, set, ghost, targetWeight, showRIR }) {
   const { dispatch } = useStore()
 
   function setField(field, value) {
     dispatch({ type: 'SET_SET_FIELD', payload: { exerciseIndex, setIndex, field, value } })
   }
   // Ghost value fills in on the first tap; the text is left selected so the
-  // very next keystroke replaces it instead of appending after it.
+  // very next keystroke replaces it instead of appending after it. Falls
+  // back to the block's target weight (weight field only) when there's no
+  // real ghost — i.e. the first time this exercise is ever logged.
   function fillGhost(field, inputEl) {
-    if (set[field] !== '' || !ghost) return
-    setField(field, String(ghost[field]))
+    if (set[field] !== '') return
+    const fallback = ghost ? ghost[field] : (field === 'weight' ? targetWeight : null)
+    if (fallback == null) return
+    setField(field, String(fallback))
     requestAnimationFrame(() => inputEl?.select())
   }
+
+  const weightPlaceholder = ghost ? String(ghost.weight) : (targetWeight != null ? String(targetWeight) : '—')
 
   return (
     <div className="grid grid-cols-[28px_1fr_1fr_1fr_30px] items-center gap-2 border-t py-2" style={{ borderColor: 'var(--border)' }}>
@@ -263,7 +270,7 @@ function SetRow({ exerciseIndex, setIndex, set, ghost, showRIR }) {
         value={set.weight}
         onChange={(e) => setField('weight', e.target.value)}
         onFocus={(e) => fillGhost('weight', e.target)}
-        placeholder={ghost ? String(ghost.weight) : '—'}
+        placeholder={weightPlaceholder}
         inputMode="decimal"
         className="tabular-nums w-full rounded-lg border p-1.5 text-center text-[13px]"
         style={{ borderColor: 'var(--border)', background: set.done ? 'var(--accent-light)' : 'var(--surface)' }}

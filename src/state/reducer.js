@@ -20,6 +20,7 @@ function buildActiveWorkoutFromRoutine(routine, sessions) {
         target: blockTarget(block),
         rest: block.rest,
         rir: block.rir,
+        targetWeight: block.targetWeight ?? null,
         sets: Array.from({ length: block.sets }, () => ({ weight: '', reps: '', rir: null, done: false, isPR: false })),
       })
     })
