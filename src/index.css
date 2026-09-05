@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #F7F5F1;
+  --surface: #FFFFFF;
+  --surface-alt: #EFEAE1;
+  --border: #E3DDCF;
+  --text: #2B2A28;
+  --muted: #837B6E;
+  --accent: #C1633A;
+  --accent-dark: #A1502D;
+  --accent-light: #F1DDCF;
+  --heat-0: #F1EADD;
+  --heat-1: #E7C6A8;
+  --heat-2: #D08F5C;
+  --heat-3: #B65A34;
+  --heat-4: #7A3319;
+  --danger: #B3412A;
+  --good: #4F7A5B;
+}
+
+html[data-theme='dark'] {
+  --bg: #201F1D;
+  --surface: #2E2C29;
+  --surface-alt: #383530;
+  --border: #45413A;
+  --text: #F3EFE7;
+  --muted: #A69C8C;
+  --accent: #D97B52;
+  --accent-dark: #E89571;
+  --accent-light: #4A362B;
+  --heat-0: #33302A;
+  --heat-1: #5A4234;
+  --heat-2: #8A5333;
+  --heat-3: #B65A34;
+  --heat-4: #D97B52;
+  --danger: #E0705A;
+  --good: #7FB08E;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Public Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+::selection { background: var(--accent); color: #fff; }
+a { color: var(--accent-dark); text-decoration: none; }
+input, textarea, select, button { font-family: 'Public Sans', system-ui, sans-serif; }
+.font-serif { font-family: 'Source Serif 4', serif; }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+button { -webkit-tap-highlight-color: transparent; }
+
+@keyframes prPop {
+  0% { transform: scale(0.6) translateY(6px); opacity: 0; }
+  55% { transform: scale(1.08) translateY(0); opacity: 1; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+@keyframes checkPop {
+  0% { transform: scale(0.7); }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+@keyframes toastIn {
+  from { transform: translate(-50%, 10px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.pr-pop { animation: prPop 0.45s ease-out; }
+.check-pop { animation: checkPop 0.3s ease-out; }
+.toast-in { animation: toastIn 0.25s ease-out; }
+.fade-in { animation: fadeIn 0.2s ease-out; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
