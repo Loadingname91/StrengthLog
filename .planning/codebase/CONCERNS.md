@@ -1,14 +1,13 @@
 # Codebase Concerns
 
 **Analysis Date:** 2026-09-05
+**Last Reviewed:** 2026-09-05 (post-milestone fixes)
 
 ## Tech Debt
 
-**No automated tests:**
-- Issue: No test framework is configured (no Jest/Vitest, no `*.test.*` files found anywhere in the repo).
-- Files: entire `src/` tree, especially complex logic in `src/lib/schedule.js`, `src/state/reducer.js`, `src/lib/selectors.js`, `src/lib/csvImport.js`
-- Impact: Regressions in scheduling math, PR/insight calculations, and reducer state transitions can ship silently. The Weekday-mode scheduling logic (`src/lib/schedule.js`) has intricate date-rollover rules that are exactly the kind of code that breaks under refactor without tests.
-- Fix approach: Add Vitest + React Testing Library; prioritize unit tests for `src/lib/schedule.js`, `src/state/reducer.js`, and `src/lib/csvImport.js` first since they contain the most business logic and no UI dependency.
+**~~No automated tests~~ — RESOLVED (2026-09-05):**
+- Vitest + React Testing Library installed (Phase 4). `src/state/reducer.js`, `src/state/StoreContext.js`'s `buildInitialState`, `src/lib/schedule.js`, `src/lib/csvImport.js`, and `src/lib/selectors.js` all now have unit tests (`*.test.js`/`*.test.jsx` alongside each source file); `ConfirmSheet`, `RoutineBuilder`'s `BlockEditSheet`, `SessionBar`, and `ErrorBoundary` have smoke-level component tests. 55 tests across 9 files, `npm test` + `npm run lint` both exit clean.
+- Not yet covered: `src/lib/insights.js`, most screen components beyond the smoke tests above, and end-to-end/integration flows (a full workout session start-to-finish, CSV import wizard end-to-end). Still a reasonable next target if this codebase's test coverage keeps expanding.
 
 **Single-file state reducer growing large:**
 - Issue: `src/state/reducer.js` (270 lines) centralizes all workout/routine/settings mutations in one switch-like reducer, alongside helper functions like `buildActiveWorkoutFromRoutine`.
@@ -60,13 +59,13 @@ None identified through static review; no bug tracker or issue list found in the
 - Files: `src/lib/schedule.js`
 - Why fragile: The comments in the file itself acknowledge the complexity ("nothing skips ahead further until it's actually completed, so a missed day pushes the whole rotation forward... without any separate drift counter to keep in sync"). Calendar-day arithmetic (timezones, DST, "local ISO date" conversions) is a classic source of off-by-one-day bugs.
 - Safe modification: Any change here should be paired with unit tests covering: routine due today, routine overdue by N days, routine due in the future, and rotation pointer advancing across a weekend/DST boundary.
-- Test coverage: None currently exists.
+- Test coverage: `src/lib/schedule.test.js` (added 2026-09-05) covers `nextUpSince` (restart-anchor precedence), `dueInfo` (due today / overdue / no-weekday-assignment), `dayStatus` (future/done/rest/today/missed), `weekStripDates` (Mon-Sun span, week-offset shift), and `defaultWeekdayAssignments`. DST-boundary rollover specifically is still untested — the underlying `Date` arithmetic is timezone-naive by construction (see `format.js`'s `localISODate` comment), so a DST-crossing test would mostly validate the JS `Date` object's own DST handling rather than this file's logic; low priority given that.
 
 **CSV import pipeline:**
 - Files: `src/lib/csvImport.js` (114 lines), `src/screens/CsvImport.jsx` (173 lines), `src/lib/csv.js` (71 lines)
 - Why fragile: Parses arbitrary user-supplied CSV data (likely from the original StrengthLog app export) into internal state shape with no visible schema validation library — manual parsing is error-prone against malformed/edge-case input (extra columns, missing fields, locale-specific number formats).
 - Safe modification: Add tests for malformed CSV rows before modifying the parser; ensure `try/catch` boundaries surface clear errors to `src/screens/CsvImport.jsx` UI rather than crashing the screen.
-- Test coverage: None.
+- Test coverage: `src/lib/csvImport.test.js` (added 2026-09-05) covers `matchExercise` (exact/alias/custom/no-match), `detectUnit` (kg/lb/no-column/no-hint), `buildCandidates` (missing-field flagging, clean rows, bad dates), and `finalizeImport` (date+exercise grouping, flagged-row exclusion, lb→kg conversion, new-exercise-name collection). `src/screens/CsvImport.jsx` (the wizard UI itself) and `src/lib/csv.js` (export formatting) remain untested.
 
 ## Scaling Limits
 
@@ -84,9 +83,9 @@ None identified through static review; no bug tracker or issue list found in the
 
 ## Missing Critical Features
 
-**No error boundary / crash reporting:**
-- Problem: No React error boundary component or crash/error-tracking integration (e.g., Sentry) was found anywhere in `src/`.
-- Blocks: A single unhandled exception in any screen (e.g., a malformed CSV import or a corrupted localStorage blob) can white-screen the entire app with no diagnostic signal reaching the developer and no graceful fallback for the user.
+**~~No error boundary / crash reporting~~ — PARTIALLY RESOLVED (2026-09-05):**
+- `src/components/ErrorBoundary.jsx` now wraps the route tree in `App.jsx` (keyed by pathname, resets on navigation), so an unhandled exception in one screen no longer white-screens the whole app — BottomNav, SessionBar, and Android back-button handling stay alive, and the user gets a "Try again" fallback. 3 passing tests in `ErrorBoundary.test.jsx`.
+- Still open: no crash/error-tracking integration (e.g. Sentry) — errors are only logged to `console.error`. Deliberately not added: this is a fully offline, single-user, local-only app with no backend, so a third-party crash-reporting SDK would be a new external dependency disproportionate to the actual risk. Revisit if the app ever gains a backend/sync feature.
 
 **No data corruption recovery:**
 - Problem: `loadState` in `src/state/storage.js` returns `null` on any parse failure, silently discarding the corrupted blob rather than attempting partial recovery or notifying the user before overwriting it on next save.
@@ -94,11 +93,10 @@ None identified through static review; no bug tracker or issue list found in the
 
 ## Test Coverage Gaps
 
-**Entire application:**
-- What's not tested: 100% of the codebase — there are zero test files in the repository.
-- Files: all of `src/`
-- Risk: Any refactor (state shape changes, scheduling logic, CSV parsing, PR/insight calculations in `src/lib/selectors.js` and `src/lib/insights.js`) has no safety net.
-- Priority: High — start with `src/lib/schedule.js`, `src/state/reducer.js`, `src/lib/csvImport.js`, and `src/lib/selectors.js` since they hold the most business-critical logic and are pure-ish (easiest to unit test without heavy mocking).
+**~~Entire application~~ — PARTIALLY RESOLVED (2026-09-05):**
+- Now tested: `src/state/reducer.js`, `src/state/StoreContext.jsx` (`buildInitialState`), `src/lib/schedule.js`, `src/lib/csvImport.js`, `src/lib/selectors.js` (`bestProductForExercise`, `totalVolume`/`totalReps`/`totalSets`, `muscleSetCounts`, `exerciseSetCounts`), plus component smoke tests for `ConfirmSheet` (hold gesture), `RoutineBuilder`'s `BlockEditSheet` (target-weight field) and drag gesture, `SessionBar`, and `ErrorBoundary`. 55 tests across 9 files.
+- Still not tested: `src/lib/insights.js`, `src/lib/csv.js` (export formatting), `src/lib/rng.js`, most screen components beyond the smoke tests listed above (full-flow rendering of `ActiveWorkout`, `RoutineBuilder`, `CsvImport`, `StatsHub`, etc.), and any end-to-end/integration flow (a full workout session start-to-finish, the CSV import wizard end-to-end).
+- Priority: Medium going forward — the highest-risk, most-fragile logic (scheduling math, CSV parsing, reducer transitions, PR/volume calculations) now has a safety net; remaining gaps are lower-severity (formatting/export helpers) or higher-cost-to-test (full component/integration flows) and can be picked up incrementally rather than as a single push.
 
 ---
 

@@ -6,9 +6,9 @@ current_phase: 4
 current_phase_name: Test Suite & Regression Safety Net
 status: complete
 stopped_at: Phase 04 verified, milestone complete
-last_updated: "2026-09-05T10:15:00.000Z"
+last_updated: "2026-09-05T10:30:00.000Z"
 last_activity: 2026-09-05
-last_activity_desc: Phase 04 Task 3 (smoke tests) and Task 4 (clean-run verification) completed; all 4 phases done
+last_activity_desc: Post-milestone fixes — drag-gesture backgrounding fix, test coverage for schedule.js/csvImport.js/selectors.js, and a React error boundary — plus PROJECT.md/CONCERNS.md brought up to date
 progress:
   total_phases: 4
   completed_phases: 4
@@ -69,6 +69,9 @@ Recent decisions affecting current work:
 - Milestone-wide: Long-press hold gesture replaces single-tap confirm for "Delete all data" (Phase 1)
 - Milestone-wide: Global persistent workout session bar instead of an in-screen-only timer (Phase 2)
 - Milestone-wide: Test suite (Vitest + Testing Library) added this milestone rather than deferred (Phase 4)
+- Post-milestone: Phase 3's deferred drag-gesture backgrounding finding fixed rather than left open indefinitely
+- Post-milestone: test coverage extended to schedule.js/csvImport.js/selectors.js beyond Phase 4's required scope (per CONCERNS.md's fragility flags)
+- Post-milestone: React error boundary added around the route tree (console-only logging, no crash-reporting SDK — app is offline/local-only)
 
 ### Pending Todos
 
@@ -78,8 +81,9 @@ None yet.
 
 None currently blocking — milestone complete. Carried-forward notes:
 
-- `CONCERNS.md` flags `src/lib/schedule.js` (weekday scheduling date arithmetic) and `src/lib/csvImport.js` as fragile with zero test coverage — out of this milestone's required TEST-01..04 scope, but a good candidate for a future milestone's test expansion.
+- `schedule.js`/`csvImport.js`/`selectors.js` test-coverage gap (previously noted here) is now closed — see `CONCERNS.md`'s Tech Debt / Fragile Areas sections (updated 2026-09-05).
 - On-device UAT for Phases 1-3 was explicitly deferred by user direction (no device/browser available in this execution environment) — `01-UAT.md`, `02-UAT.md`, `03-UAT.md` are all `status: partial`. Phase 4's own success criteria are fully machine-verifiable, so this gap doesn't block milestone completion, but a real-device pass is still recommended before considering the milestone fully closed out in practice.
+- Still open, deliberately not addressed (see `CONCERNS.md`): `reducer.js`/large-screen splitting, Prettier adoption, data-corruption recovery on a malformed `localStorage` blob, debounced saves, and any `localStorage`→IndexedDB migration. None are regressions — they're pre-existing scaling/maintainability items for a future milestone, not this one's scope.
 
 ## Deferred Items
 
