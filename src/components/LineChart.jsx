@@ -1,6 +1,14 @@
 import { useId } from 'react'
 
-export default function LineChart({ series, height = 110, mode = 'line', formatLabel = (v) => v }) {
+// Axis labels sit in a narrow gutter, so they're rounded and abbreviated —
+// a raw "53.75" or "9948" overflows the gutter and gets clipped.
+function compactLabel(n) {
+  if (n >= 10000) return `${Math.round(n / 1000)}k`
+  if (n >= 1000) return `${Math.round(n / 100) / 10}k`
+  return String(Math.round(n))
+}
+
+export default function LineChart({ series, height = 110, mode = 'line', formatLabel = compactLabel }) {
   const width = 320
   const gradientId = useId()
   const values = series.map((p) => p.value)
@@ -17,18 +25,25 @@ export default function LineChart({ series, height = 110, mode = 'line', formatL
   // Compact sparklines (Measurements) skip the axis — there isn't room for
   // tick labels without crowding the line itself.
   const showAxis = height >= 90
-  const padLeft = showAxis ? 26 : 2
+  const padLeft = showAxis ? 32 : 2
   const padRight = 4
   const padTop = 8
   const padBottom = 4
   const plotW = width - padLeft - padRight
   const plotH = height - padTop - padBottom
 
-  // Dedupe: a small integer max (e.g. a "Workouts" count of 1) would
-  // otherwise round the top and middle tick to the same label.
-  const tickValues = [...new Set([max, Math.round(max / 2), 0])]
+  // Deduped on the rendered label, not the raw value: a small max (e.g. a
+  // "Workouts" count of 1) rounds the top and middle tick to the same text,
+  // and a repeated label reads as a broken axis.
+  const seenLabels = new Set()
   const ticks = showAxis
-    ? tickValues.map((v) => ({ y: padTop + (1 - v / max) * plotH, label: formatLabel(v) }))
+    ? [max, max / 2, 0].reduce((acc, v) => {
+      const label = formatLabel(v)
+      if (seenLabels.has(label)) return acc
+      seenLabels.add(label)
+      acc.push({ y: padTop + (1 - v / max) * plotH, label })
+      return acc
+    }, [])
     : []
 
   const gridlines = ticks.map((t, i) => (

@@ -6,10 +6,14 @@ import ProgressBar from '../components/ProgressBar'
 import SegmentedControl from '../components/SegmentedControl'
 import LineChart from '../components/LineChart'
 import BodyHeatmap from '../components/BodyHeatmap'
+import CalendarHeatmap from '../components/CalendarHeatmap'
 import { CalendarIcon } from '../components/Icons'
-import { goalProgress, chartSeries, muscleSetCounts, sessionsSince, exerciseSetCounts } from '../lib/selectors'
+import {
+  goalProgress, chartSeries, muscleSetCounts, sessionsSince, exerciseSetCounts,
+  dayTallies, weekStreak, trailingComparison, recentPRs,
+} from '../lib/selectors'
 import { regionIntensities } from '../lib/muscles'
-import { daysAgo, todayISO } from '../lib/format'
+import { daysAgo, fmtDate } from '../lib/format'
 import { exerciseById } from '../lib/exercises'
 import { dueInfo, weekdayName } from '../lib/schedule'
 
@@ -39,6 +43,10 @@ export default function Home() {
   const series = useMemo(() => chartSeries(state.sessions, metric, rangeDays, activeExerciseId), [state.sessions, metric, rangeDays, activeExerciseId])
   const weekCounts = useMemo(() => muscleSetCounts(sessionsSince(state.sessions, daysAgo(6)), exercises), [state.sessions, exercises])
   const intensities = useMemo(() => regionIntensities(weekCounts), [weekCounts])
+  const tallies = useMemo(() => dayTallies(state.sessions), [state.sessions])
+  const streak = useMemo(() => weekStreak(state.sessions), [state.sessions])
+  const thisWeek = useMemo(() => trailingComparison(state.sessions), [state.sessions])
+  const prs = useMemo(() => recentPRs(state.sessions, 4), [state.sessions])
 
   const hasHistory = state.sessions.length > 0
 
@@ -163,6 +171,22 @@ export default function Home() {
       ) : (
         <>
           <div className="px-5 pt-6">
+            <div className="font-serif mb-2.5 text-base font-semibold">This week</div>
+            <Card>
+              <div className="grid grid-cols-3 gap-2">
+                <WeekStat label="Workouts" value={thisWeek.workouts} pct={thisWeek.hasBaseline ? thisWeek.workoutsPct : null} />
+                <WeekStat label="Sets" value={thisWeek.sets} pct={thisWeek.hasBaseline ? thisWeek.setsPct : null} />
+                <WeekStat label="Volume" value={`${thisWeek.volume.toLocaleString()}kg`} pct={thisWeek.hasBaseline ? thisWeek.volumePct : null} />
+              </div>
+              {thisWeek.hasBaseline && (
+                <div className="mt-2.5 text-[11px]" style={{ color: 'var(--muted)' }}>
+                  Compared with your 4-week average
+                </div>
+              )}
+            </Card>
+          </div>
+
+          <div className="px-5 pt-6">
             <div className="mb-2.5 flex items-center justify-between">
               <div className="font-serif text-base font-semibold">Overview</div>
               <SegmentedControl
@@ -188,7 +212,9 @@ export default function Home() {
               </select>
             )}
             <Card>
-              <LineChart series={series} />
+              {/* Workout counts are small discrete integers — bars read them
+                  honestly, a line implies a continuum between rest days. */}
+              <LineChart series={series} mode={metric === 'workouts' ? 'bar' : 'line'} />
               <div className="mt-1 flex justify-between text-[11px]" style={{ color: 'var(--muted)' }}>
                 <span>{rangeDays} days ago</span><span>Today</span>
               </div>
@@ -203,6 +229,44 @@ export default function Home() {
           </div>
 
           <div className="px-5 pt-6">
+            <div className="mb-2.5 flex items-center justify-between">
+              <div className="font-serif text-base font-semibold">Consistency</div>
+              {streak > 0 && (
+                <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ background: 'var(--accent-light)', color: 'var(--accent-dark)' }}>
+                  {streak} week{streak === 1 ? '' : 's'} in a row
+                </span>
+              )}
+            </div>
+            <Card>
+              <CalendarHeatmap tallies={tallies} weeks={12} onDayClick={() => navigate('/stats/log')} />
+            </Card>
+          </div>
+
+          {prs.length > 0 && (
+            <div className="px-5 pt-6">
+              <div className="font-serif mb-2.5 text-base font-semibold">Recent PRs</div>
+              <div className="flex flex-col overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--border)' }}>
+                {prs.map((pr, i) => (
+                  <div
+                    key={`${pr.sessionId}-${pr.exerciseId}-${i}`}
+                    onClick={() => navigate(`/exercise/${pr.exerciseId}`)}
+                    className="flex cursor-pointer items-center justify-between gap-2 border-b p-3 last:border-0"
+                    style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-[13px] font-semibold">{exerciseById(pr.exerciseId, exercises)?.name || pr.exerciseId}</div>
+                      <div className="text-[11px]" style={{ color: 'var(--muted)' }}>{fmtDate(pr.date)}</div>
+                    </div>
+                    <span className="tabular-nums shrink-0 rounded-full px-2.5 py-1 text-[12px] font-bold" style={{ background: 'var(--accent-light)', color: 'var(--accent-dark)' }}>
+                      🏆 {pr.weight}kg × {pr.reps}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="px-5 pt-6">
             <Card onClick={() => navigate('/stats/muscles')}>
               <div className="mb-2.5 flex items-center justify-between">
                 <div className="font-serif text-base font-semibold">Muscles worked</div>
@@ -212,6 +276,29 @@ export default function Home() {
             </Card>
           </div>
         </>
+      )}
+    </div>
+  )
+}
+
+// A number carries the week's progress; the percentage next to it is the
+// comparison a 7-point chart can't make legible on its own.
+function WeekStat({ label, value, pct }) {
+  const up = pct != null && pct > 0
+  return (
+    <div>
+      <div className="tabular-nums text-[17px] font-bold leading-tight">{value}</div>
+      <div className="mt-0.5 text-[11px]" style={{ color: 'var(--muted)' }}>{label}</div>
+      {pct != null && pct !== 0 && (
+        <div
+          className="tabular-nums mt-1 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+          style={{
+            background: up ? 'var(--accent-light)' : 'var(--surface-alt)',
+            color: up ? 'var(--accent-dark)' : 'var(--muted)',
+          }}
+        >
+          {up ? '+' : ''}{pct}%
+        </div>
       )}
     </div>
   )

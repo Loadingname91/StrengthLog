@@ -6,12 +6,8 @@ import SegmentedControl from '../components/SegmentedControl'
 import LineChart from '../components/LineChart'
 import { BackIcon } from '../components/Icons'
 import { exerciseById } from '../lib/exercises'
-import { exerciseHistory, prByRepRange } from '../lib/selectors'
+import { exerciseHistory, prByRepRange, exerciseProgress, epley1RM } from '../lib/selectors'
 import { fmtDate } from '../lib/format'
-
-function epley1RM(weight, reps) {
-  return Math.round(weight * (1 + reps / 30) * 10) / 10
-}
 
 export default function ExerciseDetail() {
   const { id } = useParams()
@@ -23,6 +19,7 @@ export default function ExerciseDetail() {
   const ex = exerciseById(id, exercises)
   const history = useMemo(() => exerciseHistory(state.sessions, id), [state.sessions, id])
   const prTable = useMemo(() => prByRepRange(state.sessions, id), [state.sessions, id])
+  const progress = useMemo(() => exerciseProgress(state.sessions, id), [state.sessions, id])
 
   const series = useMemo(() => {
     return history.map((h) => {
@@ -56,6 +53,43 @@ export default function ExerciseDetail() {
           {ex.secondary && <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ background: 'var(--surface-alt)', color: 'var(--muted)' }}>{ex.secondary}</span>}
         </div>
       </div>
+
+      {progress && (
+        <div className="px-5 pt-4">
+          <Card>
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Last session</div>
+                <div className="tabular-nums font-serif mt-0.5 text-[26px] font-bold leading-none">
+                  {progress.latest.weight}kg × {progress.latest.reps}
+                </div>
+              </div>
+              {progress.weightDelta != null && progress.weightDelta !== 0 && (
+                <span
+                  className="tabular-nums shrink-0 rounded-full px-2.5 py-1 text-[12px] font-bold"
+                  style={{
+                    background: progress.weightDelta > 0 ? 'var(--accent-light)' : 'var(--surface-alt)',
+                    color: progress.weightDelta > 0 ? 'var(--accent-dark)' : 'var(--muted)',
+                  }}
+                >
+                  {progress.weightDelta > 0 ? '+' : ''}{progress.weightDelta}kg vs last
+                </span>
+              )}
+            </div>
+            <div className="mt-3 flex gap-4 text-[12px]" style={{ color: 'var(--muted)' }}>
+              <span>Est. 1RM <b className="tabular-nums" style={{ color: 'var(--text)' }}>{progress.e1rm}kg</b></span>
+              {progress.e1rmTotalDelta != null && (
+                <span>
+                  {progress.e1rmTotalDelta > 0 ? '+' : ''}
+                  <b className="tabular-nums" style={{ color: 'var(--text)' }}>{progress.e1rmTotalDelta}kg</b>
+                  {' '}over {progress.weeks} week{progress.weeks === 1 ? '' : 's'}
+                </span>
+              )}
+              <span className="tabular-nums">{progress.sessionCount} session{progress.sessionCount === 1 ? '' : 's'}</span>
+            </div>
+          </Card>
+        </div>
+      )}
 
       <div className="px-5 pt-4">
         <div className="mb-2.5">

@@ -118,6 +118,12 @@ function StatTile({ label, value }) {
   )
 }
 
+// The commonly cited effective weekly set range per muscle group for
+// hypertrophy. Shown as a band behind each bar so the number has a reference
+// to be read against rather than standing alone.
+const SETS_TARGET_MIN = 10
+const SETS_TARGET_MAX = 20
+
 function MusclesTab() {
   const { state, exercises } = useStore()
   const navigate = useNavigate()
@@ -133,7 +139,12 @@ function MusclesTab() {
     () => Object.entries(muscleCounts).map(([m, sets]) => ({ muscle: m, perWeek: round1(sets / weeks) })).sort((a, b) => b.perWeek - a.perWeek),
     [muscleCounts, weeks]
   )
-  const maxPerWeek = Math.max(1, ...muscleRows.map((r) => r.perWeek))
+  // Scaling bars to your own busiest muscle only says which muscle you train
+  // most — not whether any of them get enough work. Scaling to a fixed
+  // effective-range axis makes "under / in range / over" readable instead.
+  const axisMax = Math.max(SETS_TARGET_MAX + 6, ...muscleRows.map((r) => r.perWeek))
+  const bandLeft = (SETS_TARGET_MIN / axisMax) * 100
+  const bandWidth = ((SETS_TARGET_MAX - SETS_TARGET_MIN) / axisMax) * 100
 
   const exerciseCounts = useMemo(() => exerciseSetCounts(inRange), [inRange])
   const exerciseRows = useMemo(() => {
@@ -153,17 +164,39 @@ function MusclesTab() {
       </Card>
 
       <div>
-        <div className="font-serif mb-2 text-base font-semibold">Most trained muscle groups (sets/week)</div>
+        <div className="font-serif mb-2 text-base font-semibold">Weekly sets per muscle group</div>
         <div className="flex flex-col gap-2">
-          {muscleRows.map((r) => (
-            <div key={r.muscle} className="flex items-center gap-2 text-xs">
-              <span className="w-20 shrink-0" style={{ color: 'var(--muted)' }}>{r.muscle}</span>
-              <div className="h-2.5 flex-1 overflow-hidden rounded-full" style={{ background: 'var(--surface-alt)' }}>
-                <div className="h-full rounded-full" style={{ width: `${(r.perWeek / maxPerWeek) * 100}%`, background: 'var(--accent)' }} />
+          {muscleRows.map((r) => {
+            const inRange = r.perWeek >= SETS_TARGET_MIN && r.perWeek <= SETS_TARGET_MAX
+            return (
+              <div key={r.muscle} className="flex items-center gap-2 text-xs">
+                <span className="w-20 shrink-0" style={{ color: 'var(--muted)' }}>{r.muscle}</span>
+                <div className="relative h-2.5 flex-1 overflow-hidden rounded-full" style={{ background: 'var(--surface-alt)' }}>
+                  <div
+                    className="absolute inset-y-0"
+                    style={{ left: `${bandLeft}%`, width: `${bandWidth}%`, background: 'var(--accent-light)' }}
+                  />
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-full"
+                    style={{
+                      width: `${Math.min(100, (r.perWeek / axisMax) * 100)}%`,
+                      background: 'var(--accent)',
+                      opacity: inRange ? 1 : 0.55,
+                    }}
+                  />
+                </div>
+                <span
+                  className="tabular-nums w-8 shrink-0 text-right font-semibold"
+                  style={{ color: inRange ? 'var(--accent-dark)' : 'var(--muted)' }}
+                >
+                  {r.perWeek}
+                </span>
               </div>
-              <span className="tabular-nums w-8 shrink-0 text-right font-semibold">{r.perWeek}</span>
-            </div>
-          ))}
+            )
+          })}
+        </div>
+        <div className="mt-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+          Shaded band = {SETS_TARGET_MIN}–{SETS_TARGET_MAX} sets/week, the usual effective range per muscle group.
         </div>
       </div>
 
