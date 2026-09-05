@@ -36,6 +36,25 @@ export default function RoutineBuilder() {
     return () => popModal(handle)
   }, [blockMenuFor])
 
+  // Abort an in-progress drag if the app is backgrounded mid-gesture — no
+  // pointerup/pointercancel fires in that case, which would otherwise leave
+  // dragId/dragY stuck until the next unrelated pointer event (same class of
+  // interrupted-gesture bug as ConfirmSheet's hold-to-confirm CR-01 fix).
+  useEffect(() => {
+    function abortDrag() {
+      if (!dragInfo.current) return
+      dragInfo.current = null
+      setDragId(null)
+      setDragY(0)
+    }
+    document.addEventListener('visibilitychange', abortDrag)
+    window.addEventListener('blur', abortDrag)
+    return () => {
+      document.removeEventListener('visibilitychange', abortDrag)
+      window.removeEventListener('blur', abortDrag)
+    }
+  }, [])
+
   const checkedIndices = useMemo(() => [...checked].sort((a, b) => a - b), [checked])
   const canGroup = useMemo(() => {
     if (checkedIndices.length < 2) return false

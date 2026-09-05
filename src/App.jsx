@@ -4,6 +4,7 @@ import { App as CapacitorApp } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
 import BottomNav from './components/BottomNav'
 import SessionBar from './components/SessionBar'
+import ErrorBoundary from './components/ErrorBoundary'
 import { useStore } from './state/StoreContext'
 import { dismissTopModal } from './lib/modalStack'
 import Home from './screens/Home'
@@ -48,6 +49,7 @@ function useAndroidBackButton() {
 
 function Shell() {
   const { pathname } = useLocation()
+  const navigate = useNavigate()
   const { state } = useStore()
   const withNav = showNavFor(pathname)
   const sessionActive = withNav && !!state.activeWorkout
@@ -55,22 +57,24 @@ function Shell() {
   return (
     <div className="mx-auto min-h-screen max-w-[480px]" style={{ background: 'var(--bg)' }}>
       <div style={{ paddingBottom: sessionActive ? 140 : withNav ? 84 : 0 }}>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/stats" element={<StatsHub />} />
-          <Route path="/stats/:tab" element={<StatsHub />} />
-          <Route path="/routines" element={<Routines />} />
-          <Route path="/routines/new" element={<RoutineBuilder />} />
-          <Route path="/routines/:id/edit" element={<RoutineBuilder />} />
-          <Route path="/routines/:id" element={<WorkoutOverview />} />
-          <Route path="/workout" element={<ActiveWorkout />} />
-          <Route path="/workout/summary" element={<WorkoutSummary />} />
-          <Route path="/exercise/:id" element={<ExerciseDetail />} />
-          <Route path="/measurements" element={<Measurements />} />
-          <Route path="/csv-import" element={<CsvImport />} />
-          <Route path="/export" element={<ExportInsights />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
+        <ErrorBoundary key={pathname} onReset={() => navigate('/')}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/stats" element={<StatsHub />} />
+            <Route path="/stats/:tab" element={<StatsHub />} />
+            <Route path="/routines" element={<Routines />} />
+            <Route path="/routines/new" element={<RoutineBuilder />} />
+            <Route path="/routines/:id/edit" element={<RoutineBuilder />} />
+            <Route path="/routines/:id" element={<WorkoutOverview />} />
+            <Route path="/workout" element={<ActiveWorkout />} />
+            <Route path="/workout/summary" element={<WorkoutSummary />} />
+            <Route path="/exercise/:id" element={<ExerciseDetail />} />
+            <Route path="/measurements" element={<Measurements />} />
+            <Route path="/csv-import" element={<CsvImport />} />
+            <Route path="/export" element={<ExportInsights />} />
+            <Route path="/settings" element={<Settings />} />
+          </Routes>
+        </ErrorBoundary>
       </div>
       {withNav && <SessionBar />}
       {withNav && <BottomNav />}
