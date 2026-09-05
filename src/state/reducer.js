@@ -256,8 +256,7 @@ export function reducer(state, action) {
         measurements: [],
         activeWorkout: null,
         goals: [],
-        customExercises: [],
-        exerciseNotes: {},
+        lastFinishedSession: null,
       }
 
     default:
