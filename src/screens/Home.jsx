@@ -43,6 +43,9 @@ export default function Home() {
   const hasHistory = state.sessions.length > 0
 
   function startWorkout(routineId) {
+    // A workout is already in progress — resume it instead of silently
+    // discarding it. Mirrors BottomNav's handleLog resume behavior.
+    if (state.activeWorkout) { navigate('/workout'); return }
     dispatch({ type: 'START_WORKOUT', payload: { routineId } })
     navigate('/workout')
   }

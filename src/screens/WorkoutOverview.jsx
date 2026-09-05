@@ -44,6 +44,9 @@ export default function WorkoutOverview() {
   const exerciseCount = routine.blocks.reduce((s, b) => s + b.exerciseIds.length, 0)
 
   function start() {
+    // A workout is already in progress — resume it instead of silently
+    // discarding it. Mirrors BottomNav's handleLog resume behavior.
+    if (state.activeWorkout) { navigate('/workout'); return }
     dispatch({ type: 'START_WORKOUT', payload: { routineId: routine.id } })
     navigate('/workout')
   }

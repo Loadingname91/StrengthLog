@@ -109,6 +109,11 @@ export function reducer(state, action) {
       return { ...state, measurements: state.measurements.filter((m) => m.id !== action.payload) }
 
     case 'START_WORKOUT': {
+      // Never silently discard an in-progress session — callers must
+      // dispatch DISCARD_WORKOUT (after explicit user confirmation) before
+      // starting a new one. Defense-in-depth backstop; UI call sites already
+      // resume the existing session instead of reaching this case at all.
+      if (state.activeWorkout) return state
       const routine = state.routines.find((r) => r.id === action.payload.routineId)
       if (!routine) return state
       return { ...state, activeWorkout: buildActiveWorkoutFromRoutine(routine, state.sessions) }
