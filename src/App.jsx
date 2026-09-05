@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-ro
 import { App as CapacitorApp } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
 import BottomNav from './components/BottomNav'
+import SessionBar from './components/SessionBar'
+import { useStore } from './state/StoreContext'
 import Home from './screens/Home'
 import StatsHub from './screens/StatsHub'
 import Routines from './screens/Routines'
@@ -44,11 +46,13 @@ function useAndroidBackButton() {
 
 function Shell() {
   const { pathname } = useLocation()
+  const { state } = useStore()
   const withNav = showNavFor(pathname)
+  const sessionActive = withNav && !!state.activeWorkout
   useAndroidBackButton()
   return (
     <div className="mx-auto min-h-screen max-w-[480px]" style={{ background: 'var(--bg)' }}>
-      <div style={{ paddingBottom: withNav ? 84 : 0 }}>
+      <div style={{ paddingBottom: sessionActive ? 140 : withNav ? 84 : 0 }}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/stats" element={<StatsHub />} />
@@ -66,6 +70,7 @@ function Shell() {
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </div>
+      {withNav && <SessionBar />}
       {withNav && <BottomNav />}
     </div>
   )
