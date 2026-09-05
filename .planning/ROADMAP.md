@@ -29,7 +29,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. An existing user's saved routines, sessions, and settings are byte-for-byte unaffected by this change — the seed path never runs when `localStorage` already holds data.
   3. Tapping "Delete all data" once does nothing destructive — the action only fires after a press-and-hold gesture completes, with a visible progress indicator filling during the hold.
   4. Releasing the hold before it completes cancels the action cleanly — no toast, no state change, no partial deletion.
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 01-01-PLAN.md — Fresh install starts with zero seeded data; existing-user data provably untouched (DATA-01, DATA-02)
+- [ ] 01-02-PLAN.md — "Delete all data" requires a 1.5s press-and-hold with visible fill; early release cancels silently (SAFE-01, SAFE-02)
 
 ### Phase 2: Uninterrupted Workout Sessions
 **Goal**: Users can trust the active workout to guide their input correctly and never lose their place, whether they navigate away, background the app, or have no logging history for an exercise yet — this is the milestone's direct delivery of the project's stated core value.
@@ -75,7 +78,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Fresh Install & Safe Deletion | 0/TBD | Not started | - |
+| 1. Fresh Install & Safe Deletion | 0/2 | Planned | - |
 | 2. Uninterrupted Workout Sessions | 0/TBD | Not started | - |
 | 3. Interaction Quality Audit | 0/TBD | Not started | - |
 | 4. Test Suite & Regression Safety Net | 0/TBD | Not started | - |
