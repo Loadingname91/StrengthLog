@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useStore } from '../state/StoreContext'
 import ExerciseLibraryPicker from './ExerciseLibrary'
@@ -6,6 +6,7 @@ import { BackIcon, GripIcon } from '../components/Icons'
 import { exerciseById } from '../lib/exercises'
 import { blockTarget } from '../lib/format'
 import { uid } from '../lib/id'
+import { pushModal, popModal } from '../lib/modalStack'
 
 export default function RoutineBuilder() {
   const { id } = useParams()
@@ -26,6 +27,14 @@ export default function RoutineBuilder() {
   const rowRefs = useRef({})
   const dragInfo = useRef(null)
   const suppressClickRef = useRef(false)
+
+  // Android hardware back dismisses the open block menu instead of
+  // navigating away, matching ConfirmSheet's modal-stack behavior.
+  useEffect(() => {
+    if (!blockMenuFor) return
+    const handle = pushModal(() => setBlockMenuFor(null))
+    return () => popModal(handle)
+  }, [blockMenuFor])
 
   const checkedIndices = useMemo(() => [...checked].sort((a, b) => a - b), [checked])
   const canGroup = useMemo(() => {

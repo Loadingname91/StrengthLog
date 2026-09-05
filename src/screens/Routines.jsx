@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../state/StoreContext'
 import Card from '../components/Card'
@@ -9,6 +9,7 @@ import { GripIcon, ChevronRightIcon, EditIcon, TrashIcon } from '../components/I
 import { exerciseById } from '../lib/exercises'
 import { uid } from '../lib/id'
 import { weekdayName } from '../lib/schedule'
+import { pushModal, popModal } from '../lib/modalStack'
 
 function estimateDuration(routine) {
   const seconds = routine.blocks.reduce((sum, b) => sum + b.sets * (50 + b.rest), 0)
@@ -21,6 +22,14 @@ export default function Routines() {
   const [menuFor, setMenuFor] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [editingSchedule, setEditingSchedule] = useState(false)
+
+  // Android hardware back dismisses the open action menu instead of
+  // navigating away, matching ConfirmSheet's modal-stack behavior.
+  useEffect(() => {
+    if (!menuFor) return
+    const handle = pushModal(() => setMenuFor(null))
+    return () => popModal(handle)
+  }, [menuFor])
 
   const ordered = state.routineOrder.map((id) => state.routines.find((r) => r.id === id)).filter(Boolean)
 
