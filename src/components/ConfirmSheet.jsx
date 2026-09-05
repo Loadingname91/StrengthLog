@@ -9,6 +9,20 @@ export default function ConfirmSheet({ open, title, body, confirmLabel = 'Confir
     return () => clearTimeout(holdTimeoutRef.current)
   }, [])
 
+  useEffect(() => {
+    function abortHold() {
+      clearTimeout(holdTimeoutRef.current)
+      setHolding(false)
+      setHoldPct(0)
+    }
+    document.addEventListener('visibilitychange', abortHold)
+    window.addEventListener('blur', abortHold)
+    return () => {
+      document.removeEventListener('visibilitychange', abortHold)
+      window.removeEventListener('blur', abortHold)
+    }
+  }, [])
+
   function startHold() {
     setHolding(true)
     setHoldPct(100)
