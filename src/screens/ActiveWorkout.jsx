@@ -3,14 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../state/StoreContext'
 import ConfirmSheet from '../components/ConfirmSheet'
 import { BackIcon, ClockIcon } from '../components/Icons'
-import { exerciseById } from '../lib/exercises'
+import { exerciseById, unitName } from '../lib/exercises'
 import { lastSessionSets } from '../lib/selectors'
 import { fmtElapsed, todayISO } from '../lib/format'
-
-function unitName(ex, exercises) {
-  const ids = ex.blockType === 'superset' ? ex.exerciseIds : [ex.exerciseId]
-  return ids.map((id) => exerciseById(id, exercises)?.name || id).join(' + ')
-}
 
 function beep() {
   try {
@@ -34,7 +29,7 @@ export default function ActiveWorkout() {
   const [confirmFinish, setConfirmFinish] = useState(false)
   const [helpFor, setHelpFor] = useState(null)
   const [prBadge, setPrBadge] = useState(null)
-  const dingPlayed = useRef(false)
+  const dingPlayedFor = useRef(null)
   const finishingRef = useRef(false)
   const weightRefs = useRef({})
   const repsRefs = useRef({})
@@ -53,10 +48,13 @@ export default function ActiveWorkout() {
   }, [])
 
   useEffect(() => {
-    if (!aw?.restUntil) { dingPlayed.current = false; return }
+    if (!aw?.restUntil) { dingPlayedFor.current = null; return }
     const remaining = new Date(aw.restUntil).getTime() - now
-    if (remaining <= 0 && !dingPlayed.current) {
-      dingPlayed.current = true
+    // Keyed on the deadline itself, not a plain boolean: REST_ADJUST moves
+    // restUntil to a new timestamp, so a "+15s" tap after the ding already
+    // fired must be able to ding again when the new deadline arrives.
+    if (remaining <= 0 && dingPlayedFor.current !== aw.restUntil) {
+      dingPlayedFor.current = aw.restUntil
       beep()
       if (navigator.vibrate) navigator.vibrate(200)
     }
@@ -180,7 +178,7 @@ export default function ActiveWorkout() {
             {current.sets.map((set, si) => {
               const restSeconds = current.restAfter[si]
               const restState = !set.done ? 'upcoming'
-                : (aw.restUntil && aw.restTotalSec === restSeconds) ? 'active'
+                : (aw.restUntil && aw.restExerciseIndex === aw.currentIndex && aw.restSetIndex === si) ? 'active'
                   : 'passed'
               const restRow = restSeconds != null && (
                 <RestRow key={`rest-${si}`} seconds={restSeconds} rowState={restState} remaining={restRemaining} />
@@ -220,7 +218,7 @@ export default function ActiveWorkout() {
               const lastInRound = si + unitExerciseIds.length - 1
               const roundRestSeconds = current.restAfter[lastInRound]
               const roundRestState = !current.sets[lastInRound]?.done ? 'upcoming'
-                : (aw.restUntil && aw.restTotalSec === roundRestSeconds) ? 'active'
+                : (aw.restUntil && aw.restExerciseIndex === aw.currentIndex && aw.restSetIndex === lastInRound) ? 'active'
                   : 'passed'
               return (
                 <div key={`round-${si}`} className="mt-2.5 rounded-xl p-2.5" style={{ background: 'var(--surface-alt)' }}>

@@ -3,6 +3,7 @@ import { reducer, initialSettings, allExercises } from './reducer'
 import { loadState, saveState } from './storage'
 import { todayISO } from '../lib/format'
 import { defaultWeekdayAssignments } from '../lib/schedule'
+import { useWorkoutNotifications } from './useWorkoutNotifications'
 
 const StoreCtx = createContext(null)
 
@@ -12,6 +13,10 @@ export function buildInitialState() {
     // Backfill fields added after this state was first saved.
     if (!persisted.weekdayAssignments) persisted.weekdayAssignments = defaultWeekdayAssignments(persisted.routineOrder)
     if (persisted.scheduleRestartAt === undefined) persisted.scheduleRestartAt = null
+    // Defaults first, persisted second — so any settings key added after a
+    // user's first save (e.g. notification prefs) reads as its default
+    // instead of undefined, without a one-off backfill line per key.
+    persisted.settings = { ...initialSettings(), ...persisted.settings }
     return persisted
   }
   return {
@@ -43,6 +48,9 @@ export function StoreProvider({ children }) {
     saveState(state)
   }, [state])
 
+  const exercises = useMemo(() => allExercises(state), [state])
+  useWorkoutNotifications(state, exercises)
+
   useEffect(() => {
     const root = document.documentElement
     const apply = () => {
@@ -56,7 +64,7 @@ export function StoreProvider({ children }) {
     return () => mq.removeEventListener('change', apply)
   }, [state.settings.theme])
 
-  const value = useMemo(() => ({ state, dispatch, exercises: allExercises(state) }), [state])
+  const value = useMemo(() => ({ state, dispatch, exercises }), [state, exercises])
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>
 }

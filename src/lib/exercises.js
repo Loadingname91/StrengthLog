@@ -33,6 +33,14 @@ export function exerciseById(id, list = EXERCISES) {
   return list.find((e) => e.id === id)
 }
 
+// A workout unit's display name: one exercise's name, or both joined with
+// "+" for a merged superset. Shared by ActiveWorkout's own UI and the
+// notification content layer so the two never drift apart.
+export function unitName(ex, list = EXERCISES) {
+  const ids = ex.blockType === 'superset' ? ex.exerciseIds : [ex.exerciseId]
+  return ids.map((id) => exerciseById(id, list)?.name || id).join(' + ')
+}
+
 export function searchExercises(list, query, muscle, equipment) {
   const q = query.trim().toLowerCase()
   return list.filter((e) => {

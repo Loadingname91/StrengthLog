@@ -114,6 +114,40 @@ function supersetWorkout() {
   }
 }
 
+// Two sets sharing the same rest duration — the shape that used to fool the
+// RestRow "active" test, which compared aw.restTotalSec === restSeconds (a
+// duration match) instead of which exercise/set actually started the rest.
+function threeSetSameRestWorkout() {
+  return {
+    id: 'w1',
+    routineId: 'r1',
+    routineName: 'Push Day',
+    startedAt: new Date().toISOString(),
+    currentIndex: 0,
+    restUntil: null,
+    restExerciseIndex: null,
+    restSetIndex: null,
+    restTotalSec: null,
+    exercises: [
+      {
+        exerciseId: 'bench-press',
+        exerciseIds: ['bench-press'],
+        blockId: 'block1',
+        blockType: 'single',
+        target: '3x8-12',
+        rir: null,
+        targetWeight: null,
+        sets: [
+          { weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 0 },
+          { weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 0 },
+          { weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 0 },
+        ],
+        restAfter: [30, 30, null],
+      },
+    ],
+  }
+}
+
 function renderWorkout(activeWorkout = twoSetWorkout()) {
   testStore = createTestStore(baseState(activeWorkout))
   return render(
@@ -231,5 +265,32 @@ describe('ActiveWorkout merged superset (Phase 6)', () => {
     const aw = testStore.getState().activeWorkout
     expect(aw.restUntil).not.toBeNull()
     expect(aw.restTotalSec).toBe(120)
+  })
+})
+
+describe('RestRow active state', () => {
+  it('only the set that actually started the current rest shows as active, not every set with the same duration', () => {
+    // Fixed clock: the component's mount-time `now` and the reducer's
+    // Date.now() at TOGGLE_SET_DONE must agree exactly, or the countdown
+    // label's remaining-seconds figure becomes a timing-dependent guess.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 0, 1, 10, 0, 0))
+    try {
+      renderWorkout(threeSetSameRestWorkout())
+
+      fireEvent.change(weightInputs()[0], { target: { value: '60' } })
+      fireEvent.change(repsInputs()[0], { target: { value: '10' } })
+      fireEvent.blur(repsInputs()[0])
+      fireEvent.change(weightInputs()[1], { target: { value: '60' } })
+      fireEvent.change(repsInputs()[1], { target: { value: '10' } })
+      fireEvent.blur(repsInputs()[1])
+
+      // Both rest rows share a 30s duration. Completing set 2 restarts the
+      // timer for position 1 — set 1's now-finished rest must not relight.
+      expect(screen.getByText('Rest — 30s')).toBeInTheDocument()
+      expect(screen.getByText('Rest — 0:30 left')).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

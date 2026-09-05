@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { reducer } from './reducer'
 
 function baseState(overrides = {}) {
@@ -224,5 +224,70 @@ describe('Superset runtime (Phase 6)', () => {
 
     const afterSecondRemove = reducer(afterOneRemove, { type: 'REMOVE_SET', payload: { exerciseIndex: 0 } })
     expect(afterSecondRemove.activeWorkout.exercises[0].sets).toHaveLength(2) // guard: can't go below one round
+  })
+})
+
+describe('REST_ADJUST / REST_SKIP', () => {
+  function startedWithSetDone(setIndex) {
+    const routine = sampleRoutine()
+    const started = reducer(baseState({ routines: [routine], routineOrder: [routine.id] }), { type: 'START_WORKOUT', payload: { routineId: routine.id } })
+    const aw = started.activeWorkout
+    const withValues = {
+      ...started,
+      activeWorkout: {
+        ...aw,
+        exercises: [{ ...aw.exercises[0], sets: aw.exercises[0].sets.map((s, i) => (i === setIndex ? { ...s, weight: '60', reps: '10' } : s)) }],
+      },
+    }
+    return reducer(withValues, { type: 'TOGGLE_SET_DONE', payload: { exerciseIndex: 0, setIndex } })
+  }
+
+  it('TOGGLE_SET_DONE records which exercise and set index started the rest', () => {
+    const next = startedWithSetDone(0)
+    expect(next.activeWorkout.restUntil).not.toBeNull()
+    expect(next.activeWorkout.restExerciseIndex).toBe(0)
+    expect(next.activeWorkout.restSetIndex).toBe(0)
+    expect(next.activeWorkout.restTotalSec).toBe(90)
+  })
+
+  it('shifts restUntil and keeps restTotalSec in sync with it', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 0, 1, 10, 0, 0))
+    try {
+      const resting = startedWithSetDone(0)
+      const restUntilBefore = new Date(resting.activeWorkout.restUntil).getTime()
+
+      const extended = reducer(resting, { type: 'REST_ADJUST', payload: 15 })
+      expect(new Date(extended.activeWorkout.restUntil).getTime()).toBe(restUntilBefore + 15000)
+      expect(extended.activeWorkout.restTotalSec).toBe(105)
+
+      const shortened = reducer(extended, { type: 'REST_ADJUST', payload: -15 })
+      expect(new Date(shortened.activeWorkout.restUntil).getTime()).toBe(restUntilBefore)
+      expect(shortened.activeWorkout.restTotalSec).toBe(90)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('clamps the deadline so repeated "-15s" taps can never push it into the past', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 0, 1, 10, 0, 0))
+    try {
+      const resting = startedWithSetDone(0) // 90s rest
+      const clamped = reducer(resting, { type: 'REST_ADJUST', payload: -300 })
+      expect(new Date(clamped.activeWorkout.restUntil).getTime()).toBe(Date.now())
+      expect(clamped.activeWorkout.restTotalSec).toBeGreaterThanOrEqual(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('REST_SKIP clears every rest field, not just restUntil', () => {
+    const resting = startedWithSetDone(0)
+    const skipped = reducer(resting, { type: 'REST_SKIP' })
+    expect(skipped.activeWorkout.restUntil).toBeNull()
+    expect(skipped.activeWorkout.restExerciseIndex).toBeNull()
+    expect(skipped.activeWorkout.restSetIndex).toBeNull()
+    expect(skipped.activeWorkout.restTotalSec).toBeNull()
   })
 })

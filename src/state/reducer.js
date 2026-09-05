@@ -5,7 +5,17 @@ import { backfillSequence } from '../lib/blocks'
 import { uid } from '../lib/id'
 
 export function initialSettings() {
-  return { units: 'kg', theme: 'system', restDefault: 90, showRIR: true }
+  return {
+    units: 'kg',
+    theme: 'system',
+    restDefault: 90,
+    showRIR: true,
+    notifyRestDone: true,
+    notifyOngoing: true,
+    notifyPR: true,
+    notifyReminders: false,
+    reminderTime: '18:00',
+  }
 }
 
 // Expands one routine block into a runtime unit. A superset block produces
@@ -55,6 +65,7 @@ function buildActiveWorkoutFromRoutine(routine) {
     currentIndex: 0,
     restUntil: null,
     restExerciseIndex: null,
+    restSetIndex: null,
     restTotalSec: null,
     exercises: routine.blocks.map(expandUnit),
   }
@@ -202,15 +213,17 @@ export function reducer(state, action) {
 
       let restUntil = aw.restUntil
       let restExerciseIndex = aw.restExerciseIndex
+      let restSetIndex = aw.restSetIndex
       let restTotalSec = aw.restTotalSec
       const restSeconds = ex.restAfter[setIndex]
       if (willBeDone && restSeconds != null) {
         restUntil = new Date(Date.now() + restSeconds * 1000).toISOString()
         restExerciseIndex = exerciseIndex
+        restSetIndex = setIndex
         restTotalSec = restSeconds
       }
 
-      return { ...state, activeWorkout: { ...aw, exercises, restUntil, restExerciseIndex, restTotalSec, lastPR: isPR ? { exerciseIndex, setIndex } : aw.lastPR } }
+      return { ...state, activeWorkout: { ...aw, exercises, restUntil, restExerciseIndex, restSetIndex, restTotalSec, lastPR: isPR ? { exerciseIndex, setIndex } : aw.lastPR } }
     }
 
     case 'GOTO_EXERCISE':
@@ -219,13 +232,25 @@ export function reducer(state, action) {
 
     case 'REST_ADJUST': {
       if (!state.activeWorkout?.restUntil) return state
-      const next = new Date(new Date(state.activeWorkout.restUntil).getTime() + action.payload * 1000)
-      return { ...state, activeWorkout: { ...state.activeWorkout, restUntil: next.toISOString() } }
+      const now = Date.now()
+      const prevUntilMs = new Date(state.activeWorkout.restUntil).getTime()
+      // Clamped so repeated "-15s" taps near the end of a rest can't push the
+      // deadline into the past — a native alarm armed against a past
+      // timestamp would fire immediately instead of not at all.
+      const nextUntilMs = Math.max(now, prevUntilMs + action.payload * 1000)
+      // restTotalSec is the ring's denominator; it has to move with the
+      // deadline; or "+15s" would visually overflow the ring past full.
+      const prevTotal = state.activeWorkout.restTotalSec ?? 0
+      const nextTotal = Math.max(1, prevTotal + action.payload)
+      return {
+        ...state,
+        activeWorkout: { ...state.activeWorkout, restUntil: new Date(nextUntilMs).toISOString(), restTotalSec: nextTotal },
+      }
     }
 
     case 'REST_SKIP':
       if (!state.activeWorkout) return state
-      return { ...state, activeWorkout: { ...state.activeWorkout, restUntil: null, restExerciseIndex: null } }
+      return { ...state, activeWorkout: { ...state.activeWorkout, restUntil: null, restExerciseIndex: null, restSetIndex: null, restTotalSec: null } }
 
     case 'FINISH_WORKOUT': {
       const aw = state.activeWorkout

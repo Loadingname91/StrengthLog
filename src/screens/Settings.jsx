@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
 import { useStore } from '../state/StoreContext'
 import Card from '../components/Card'
 import SegmentedControl from '../components/SegmentedControl'
@@ -55,6 +56,48 @@ export default function Settings() {
           </Row>
         </Card>
       </div>
+
+      {Capacitor.isNativePlatform() && (
+        <div className="px-5 pt-5">
+          <div className="mb-2 text-[13px] font-semibold">Notifications</div>
+          <Card>
+            <Row label="Rest-timer alerts">
+              <input type="checkbox" checked={state.settings.notifyRestDone} onChange={(e) => set({ notifyRestDone: e.target.checked })} className="h-5 w-5" />
+            </Row>
+            <div className="h-px" style={{ background: 'var(--border)' }} />
+            <Row label="Ongoing workout notification">
+              <input type="checkbox" checked={state.settings.notifyOngoing} onChange={(e) => set({ notifyOngoing: e.target.checked })} className="h-5 w-5" />
+            </Row>
+            {!state.settings.notifyOngoing && (
+              <div className="pb-2.5 text-[11px]" style={{ color: 'var(--muted)' }}>
+                Rest-timer alerts run inside this notification, so turning it off also turns those off.
+              </div>
+            )}
+            <div className="h-px" style={{ background: 'var(--border)' }} />
+            <Row label="Celebrate PRs">
+              <input type="checkbox" checked={state.settings.notifyPR} onChange={(e) => set({ notifyPR: e.target.checked })} className="h-5 w-5" />
+            </Row>
+            <div className="h-px" style={{ background: 'var(--border)' }} />
+            <Row label="Workout reminders">
+              <input type="checkbox" checked={state.settings.notifyReminders} onChange={(e) => set({ notifyReminders: e.target.checked })} className="h-5 w-5" />
+            </Row>
+            {state.settings.notifyReminders && (
+              <>
+                <div className="h-px" style={{ background: 'var(--border)' }} />
+                <Row label="Reminder time">
+                  <input
+                    type="time"
+                    value={state.settings.reminderTime}
+                    onChange={(e) => set({ reminderTime: e.target.value })}
+                    className="rounded-lg border p-1.5 text-sm"
+                    style={{ borderColor: 'var(--border)' }}
+                  />
+                </Row>
+              </>
+            )}
+          </Card>
+        </div>
+      )}
 
       <div className="px-5 pt-5">
         <div className="mb-2 text-[13px] font-semibold">Goals</div>

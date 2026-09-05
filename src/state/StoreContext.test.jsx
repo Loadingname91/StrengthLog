@@ -44,4 +44,33 @@ describe('buildInitialState', () => {
     expect(state.weekdayAssignments).toBeDefined()
     expect(state.scheduleRestartAt).toBeNull()
   })
+
+  it('backfills new settings keys for existing users without discarding their existing choices', () => {
+    const persisted = {
+      routines: [],
+      routineOrder: [],
+      sessions: [],
+      customExercises: [],
+      settings: { units: 'lb' }, // predates notifyRestDone/notifyOngoing/etc.
+    }
+    localStorage.setItem(KEY, JSON.stringify(persisted))
+
+    const state = buildInitialState()
+
+    expect(state.settings.units).toBe('lb') // user's own choice survives
+    expect(state.settings.notifyRestDone).toBe(true) // new key reads as its default, not undefined
+    expect(state.settings.notifyOngoing).toBe(true)
+    expect(state.settings.notifyPR).toBe(true)
+    expect(state.settings.notifyReminders).toBe(false)
+    expect(state.settings.reminderTime).toBe('18:00')
+  })
+
+  it('backfills a full settings object for a persisted blob that never had one at all', () => {
+    localStorage.setItem(KEY, JSON.stringify({ routines: [], routineOrder: [], sessions: [], customExercises: [] }))
+
+    const state = buildInitialState()
+
+    expect(state.settings.units).toBe('kg')
+    expect(state.settings.notifyRestDone).toBe(true)
+  })
 })
