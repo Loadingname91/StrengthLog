@@ -1,8 +1,8 @@
 ---
 phase: 01-fresh-install-safe-deletion
 verified: 2026-09-05T09:05:00Z
-status: human_needed
-score: 3/5 must-haves verified
+status: passed
+score: 3/5 must-haves verified (2 deferred by explicit user direction — see note below)
 behavior_unverified: 2
 behavior_unverified_items:
   - truth: "Holding 'Delete everything' for the full ~1.5s deletes all data and closes the sheet; releasing before 1.5s cancels cleanly with no toast, no partial state change, and no deletion."
@@ -19,7 +19,9 @@ behavior_unverified_items:
 
 **Phase Goal:** A fresh install starts with zero fake data, and the app's most destructive action can no longer be triggered by accident.
 **Verified:** 2026-09-05T09:05:00Z
-**Status:** human_needed
+**Status:** passed (with deferred human verification — see note)
+
+> **Note on status:** Per explicit user direction (2026-09-05), the 2 on-device human-verification items below were deferred rather than executed — the user will test on a real device later. Status is recorded as `passed` to unblock phase progression at the user's request, not because these two items were actually confirmed on-device. See `01-UAT.md` (status: `partial`) for the deferred items.
 
 ## Goal Achievement
 
