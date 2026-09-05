@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
 import { reducer, initialSettings, allExercises } from './reducer'
 import { loadState, saveState } from './storage'
-import { buildSeed } from '../lib/seed'
+import { todayISO } from '../lib/format'
 import { defaultWeekdayAssignments } from '../lib/schedule'
 
 const StoreCtx = createContext(null)
@@ -21,7 +21,18 @@ function buildInitialState() {
     exerciseNotes: {},
     importPresets: [],
     lastFinishedSession: null,
-    ...buildSeed(),
+    routines: [],
+    routineOrder: [],
+    sequenceIndex: 0,
+    routineMode: 'sequence',
+    weekdayAssignments: defaultWeekdayAssignments([]),
+    scheduleRestartAt: null,
+    sessions: [],
+    measurements: [],
+    goals: [],
+    activeWorkout: null,
+    lastImportedAt: null,
+    createdAt: todayISO(),
   }
 }
 
