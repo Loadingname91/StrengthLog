@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
+const HOLD_DURATION_MS = 1500
+
 export default function ConfirmSheet({ open, title, body, confirmLabel = 'Confirm', danger = false, holdToConfirm = false, onConfirm, onCancel }) {
   const [holding, setHolding] = useState(false)
   const [holdPct, setHoldPct] = useState(0)
@@ -23,10 +25,20 @@ export default function ConfirmSheet({ open, title, body, confirmLabel = 'Confir
     }
   }, [])
 
+  // Reset stale hold state from a previous open/close cycle — this instance
+  // persists across opens (Settings.jsx never unmounts it), so a completed
+  // or aborted hold from last time must not carry into the next open.
+  useEffect(() => {
+    if (open) {
+      setHolding(false)
+      setHoldPct(0)
+    }
+  }, [open])
+
   function startHold() {
     setHolding(true)
     setHoldPct(100)
-    holdTimeoutRef.current = setTimeout(() => onConfirm(), 1500)
+    holdTimeoutRef.current = setTimeout(() => onConfirm(), HOLD_DURATION_MS)
   }
 
   function cancelHold() {
@@ -65,7 +77,7 @@ export default function ConfirmSheet({ open, title, body, confirmLabel = 'Confir
             >
               <div
                 className="absolute inset-y-0 left-0 pointer-events-none"
-                style={{ width: holdPct + '%', background: 'rgba(255,255,255,0.25)', transition: holding ? 'width 1500ms linear' : 'width 150ms ease-out' }}
+                style={{ width: holdPct + '%', background: 'rgba(255,255,255,0.25)', transition: holding ? `width ${HOLD_DURATION_MS}ms linear` : 'width 150ms ease-out' }}
               />
               <span className="relative z-10">{confirmLabel}</span>
             </button>
