@@ -1,4 +1,26 @@
-export default function ConfirmSheet({ open, title, body, confirmLabel = 'Confirm', danger = false, onConfirm, onCancel }) {
+import { useEffect, useRef, useState } from 'react'
+
+export default function ConfirmSheet({ open, title, body, confirmLabel = 'Confirm', danger = false, holdToConfirm = false, onConfirm, onCancel }) {
+  const [holding, setHolding] = useState(false)
+  const [holdPct, setHoldPct] = useState(0)
+  const holdTimeoutRef = useRef(null)
+
+  useEffect(() => {
+    return () => clearTimeout(holdTimeoutRef.current)
+  }, [])
+
+  function startHold() {
+    setHolding(true)
+    setHoldPct(100)
+    holdTimeoutRef.current = setTimeout(() => onConfirm(), 1500)
+  }
+
+  function cancelHold() {
+    clearTimeout(holdTimeoutRef.current)
+    setHolding(false)
+    setHoldPct(0)
+  }
+
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onCancel}>
@@ -17,13 +39,31 @@ export default function ConfirmSheet({ open, title, body, confirmLabel = 'Confir
           >
             Cancel
           </button>
-          <button
-            onClick={onConfirm}
-            className="flex-1 rounded-2xl py-3 text-sm font-semibold text-white"
-            style={{ background: danger ? 'var(--danger)' : 'var(--accent)' }}
-          >
-            {confirmLabel}
-          </button>
+          {holdToConfirm ? (
+            <button
+              onPointerDown={startHold}
+              onPointerUp={cancelHold}
+              onPointerLeave={cancelHold}
+              onPointerCancel={cancelHold}
+              onContextMenu={(e) => e.preventDefault()}
+              className="relative flex-1 overflow-hidden rounded-2xl py-3 text-sm font-semibold text-white"
+              style={{ background: 'var(--danger)', touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
+            >
+              <div
+                className="absolute inset-y-0 left-0 pointer-events-none"
+                style={{ width: holdPct + '%', background: 'rgba(255,255,255,0.25)', transition: holding ? 'width 1500ms linear' : 'width 150ms ease-out' }}
+              />
+              <span className="relative z-10">{confirmLabel}</span>
+            </button>
+          ) : (
+            <button
+              onClick={onConfirm}
+              className="flex-1 rounded-2xl py-3 text-sm font-semibold text-white"
+              style={{ background: danger ? 'var(--danger)' : 'var(--accent)' }}
+            >
+              {confirmLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>

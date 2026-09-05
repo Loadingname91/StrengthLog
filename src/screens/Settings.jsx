@@ -94,6 +94,7 @@ export default function Settings() {
         body="This permanently removes every workout, measurement, and goal on this device. Routines and the exercise library are kept."
         confirmLabel="Delete everything"
         danger
+        holdToConfirm
         onCancel={() => setConfirmDelete(false)}
         onConfirm={() => { dispatch({ type: 'DELETE_ALL_DATA' }); setConfirmDelete(false) }}
       />
