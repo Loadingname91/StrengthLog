@@ -32,7 +32,13 @@ Logging a workout mid-session — weight, reps, RIR, rest — must be fast, reli
 
 ### Active
 
-None — all requirements for the v1.0 stabilization milestone are validated and shipped.
+v1.0 stabilization milestone: none — all requirements validated and shipped.
+
+v1.1 "Smart Set Flow" milestone (in planning, 2026-09-05):
+- [ ] Bigger, touch-friendly weight/reps inputs in Active Workout with auto-advancing focus and auto-mark-done once both fields are filled
+- [ ] Rest becomes an explicit, individually-editable row in a routine block's set sequence (in Routine Builder and Active Workout), not just an implicit per-block number — new rest rows default from Settings' "Default rest (sec)"
+- [ ] Merging exercises into a superset in Routine Builder produces a sequence that alternates the exercises per round, with rest inserted only after each full round (not every individual set)
+- [ ] Active Workout auto-advances between a merged superset's exercises after each set and renders them as one interleaved flow, instead of requiring manual tab-switching
 
 ### Out of Scope
 
@@ -41,6 +47,16 @@ None — all requirements for the v1.0 stabilization milestone are validated and
 
 ## Context
 
+- **v1.1 "Smart Set Flow" milestone opened 2026-09-05.** Three related asks from
+  real use: (1) weight/reps entry needs bigger inputs and fewer taps on a
+  phone; (2) rest needs to be an explicit, editable part of a routine's set
+  sequence rather than one implicit per-block number; (3) supersets need to
+  actually alternate exercises automatically in Active Workout, with rest
+  clustered around each full round rather than each individual set. Discussion
+  completed and design locked (see `.planning/phases/05-fast-set-entry/05-DISCUSSION-LOG.md`
+  and `.planning/phases/06-structured-sets/06-DISCUSSION-LOG.md`); phases
+  5-6 have CONTEXT.md written and are ready for UI-SPEC/planning. Requirements
+  ENTRY-01..03, REST-01..05, SUPER-01..03 added to `REQUIREMENTS.md`.
 - Full product vision lives in `docs/app.md` (PRD) — screens, interaction rules, and the phased MVP cut this project already mostly implements
 - Fresh codebase map lives in `.planning/codebase/` (STACK, ARCHITECTURE, STRUCTURE, CONVENTIONS, TESTING, INTEGRATIONS, CONCERNS) — `TESTING.md` confirms zero test framework currently exists; `CONCERNS.md` has the fuller technical-debt list
 - App is fully offline/local-only: state persists to `localStorage` (`src/state/storage.js`), no backend, no auth, no external APIs

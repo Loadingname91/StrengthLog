@@ -94,7 +94,7 @@ Plans:
 
 - [x] 04-01-PLAN.md
 
-## Progress
+## Progress (v1.0 — Stabilization Milestone)
 
 **Execution Order:**
 Phases execute in numeric order: 1 → 2 → 3 → 4
@@ -105,3 +105,86 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 2. Uninterrupted Workout Sessions | 2/2 | Complete    | 2026-09-05 |
 | 3. Interaction Quality Audit | 1/1 | Complete    | 2026-09-05 |
 | 4. Test Suite & Regression Safety Net | 1/1 | Complete    | 2026-09-05 |
+
+v1.0 shipped 2026-09-05 — all 16 requirements complete. Post-milestone fixes
+also landed the same day (drag-gesture backgrounding guard, error boundary,
+corrupted-storage backup, test coverage for `schedule.js`/`csvImport.js`/
+`selectors.js` — see `PROJECT.md` Key Decisions).
+
+---
+
+# Roadmap: v1.1 — Smart Set Flow
+
+## Overview
+
+This milestone targets how logging actually *feels* mid-set, on a phone, one-handed —
+the thing v1.0's core value statement names directly. Three related gaps surfaced
+from real use: (1) weight/reps inputs are small and require manual re-tapping
+between every field and every set; (2) a block's rest is a single implicit
+number, not something the user can see or shape as part of the set sequence
+they're authoring; (3) supersets exist in the data model (`type: 'superset'`)
+but the two exercises still require manual tab-switching in Active Workout —
+nothing actually alternates them or clusters their rest around the pair
+rather than each individual set.
+
+The first gap (fast entry) is fully independent of the other two and ships
+first as a quick, low-risk win. The other two share one underlying data-model
+change — an explicit `sequence` of set/rest (or, for supersets, round/rest)
+steps replacing today's flat `sets: N` count + single `rest` value — so they're
+one phase with two plans (authoring, then runtime), matching this project's
+existing convention of splitting tightly-coupled work into plans rather than
+separate phases (see Phase 1 and Phase 2).
+
+**Design decisions locked via discussion on 2026-09-05** (see
+`.planning/phases/05-fast-set-entry/05-DISCUSSION-LOG.md` and
+`.planning/phases/06-structured-sets/06-DISCUSSION-LOG.md`):
+- Rest becomes an explicit, individually-editable row in the set sequence (not just a per-block toggle)
+- Merged supersets auto-advance and render as one interleaved flow in Active Workout (not manual tab-switching)
+- Fast entry does both auto-advance-focus AND auto-mark-done
+
+## Phases
+
+- [ ] **Phase 5: Fast Set Entry** - Weight/reps inputs are bigger and touch-friendly; confirming a field auto-advances to the next one, and a set auto-completes once both values are filled
+- [ ] **Phase 6: Structured Sets — Rest Rows & Superset Merge** - Rest becomes an explicit, editable row in a block's set sequence; merging exercises into a superset makes Active Workout auto-alternate between them with rest clustered around each full round
+
+## Phase Details
+
+### Phase 5: Fast Set Entry
+**Goal**: Logging a set on a phone takes fewer taps — bigger inputs, auto-advancing focus, and automatic completion once both values are in.
+**Mode:** mvp
+**Depends on**: Nothing (fully independent of Phase 6)
+**Requirements**: ENTRY-01, ENTRY-02, ENTRY-03
+**Success Criteria** (what must be TRUE):
+  1. Active Workout's weight and reps inputs are visibly larger (font size and tap-target height) than today's compact row, without breaking the 3-column set-row layout on a 390px-wide phone viewport.
+  2. Confirming a value in the weight field (Enter/keyboard "Next"/blur with a valid number) moves focus to that same set's reps field.
+  3. Confirming a value in the reps field moves focus to the next set's weight field; on the last set of the current exercise, it blurs instead of focusing nothing useful.
+  4. Once both weight and reps hold valid values for a not-yet-done set, the set is automatically marked done — no separate tap on the checkmark required.
+  5. The checkmark button still works as a manual toggle (override an auto-mark, or mark done without filling both fields), and editing a field after auto-completion does not un-mark the set.
+**Plans**: TBD — ready to plan (context captured, no UI-SPEC blocker; see `05-CONTEXT.md`)
+**UI hint**: yes
+
+### Phase 6: Structured Sets — Rest Rows & Superset Merge
+**Goal**: A block's set sequence — including rest — is something the user authors and sees explicitly, and a merged superset actually alternates in Active Workout instead of requiring manual tab-switching.
+**Mode:** mvp
+**Depends on**: Nothing structurally (independent of Phase 5; both touch Active Workout's `SetRow`/exercise-progression code, so sequencing matters for merge conflicts more than logical dependency)
+**Requirements**: REST-01, REST-02, REST-03, REST-04, REST-05, SUPER-01, SUPER-02, SUPER-03
+**Success Criteria** (what must be TRUE):
+  1. In Routine Builder's block editor, the set count is replaced by an explicit, ordered list of set/rest rows; the user can add a rest row (defaulting to Settings' "Default rest (sec)"), remove one, and edit any rest row's duration independently.
+  2. Adding a new set via "+ Add Set" automatically appends a rest row after it (matching today's implicit auto-rest behavior), which the user can then remove if they don't want rest there (e.g. a drop set).
+  3. Selecting 2+ single-exercise blocks and merging them produces a superset whose sequence alternates the exercises per round, with rest inserted only after a full round (one set from each exercise), not after every individual set.
+  4. A routine saved before this milestone (only a `sets` count + one `rest` value, no `sequence`) loads, displays, and runs in Active Workout exactly as it did before — backfilled into the new model transparently, with no user-visible change until they edit that block.
+  5. In Active Workout, rest appears as an explicit row in the set list (in addition to/replacing the existing bottom sticky timer for the equivalent moment), reflecting the authored sequence rather than a single implicit per-block number.
+  6. In Active Workout, completing a set within a merged superset automatically advances to the next exercise in the round — no manual tab tap required to follow the intended alternating flow.
+  7. A merged superset renders as one interleaved view in Active Workout (both exercises' current position visible together), not two separate per-exercise tabs requiring manual switching.
+**Plans**: 2 plans (ready to plan — context captured; see `06-CONTEXT.md`)
+Plans:
+- [ ] 06-01-PLAN.md — Data model (`sequence` field + backfill) and Routine Builder authoring UI (REST-01..04, SUPER-01)
+- [ ] 06-02-PLAN.md — Active Workout runtime: rest rows in the set list, superset auto-advance and merged rendering (REST-05, SUPER-02, SUPER-03)
+**UI hint**: yes
+
+## Progress (v1.1 — Smart Set Flow)
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 5. Fast Set Entry | 0/TBD | Context captured | - |
+| 6. Structured Sets — Rest Rows & Superset Merge | 0/2 | Context captured | - |

@@ -1,20 +1,20 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-current_phase: 4
-current_phase_name: Test Suite & Regression Safety Net
-status: complete
-stopped_at: Phase 04 verified, milestone complete
-last_updated: "2026-09-05T10:30:00.000Z"
+milestone: v1.1
+milestone_name: Smart Set Flow
+current_phase: 5
+current_phase_name: Fast Set Entry
+status: planning
+stopped_at: Phase 5 and 6 CONTEXT captured; ready for UI-SPEC/planning
+last_updated: "2026-09-05T11:00:00.000Z"
 last_activity: 2026-09-05
-last_activity_desc: Post-milestone fixes — drag-gesture backgrounding fix, test coverage for schedule.js/csvImport.js/selectors.js, and a React error boundary — plus PROJECT.md/CONCERNS.md brought up to date
+last_activity_desc: v1.0 shipped and closed; v1.1 "Smart Set Flow" opened — discussion completed (fast entry, structured rest rows, superset auto-advance), Phases 5-6 CONTEXT.md written, REQUIREMENTS.md/ROADMAP.md updated
 progress:
-  total_phases: 4
+  total_phases: 6
   completed_phases: 4
   total_plans: 6
   completed_plans: 6
-  percent: 100
+  percent: 67
 ---
 
 # Project State
@@ -24,16 +24,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-05)
 
 **Core value:** Logging a workout mid-session — weight, reps, RIR, rest — must be fast, reliable, and never lose data, even if the user backgrounds the app or navigates away mid-session.
-**Current focus:** Milestone v1.0 complete — all 4 phases shipped
+**Current focus:** v1.0 shipped (4/4 phases). v1.1 "Smart Set Flow" in planning — Phases 5-6 context captured, ready for UI-SPEC/detailed planning.
 
 ## Current Position
 
-Phase: 4 of 4 — Test Suite & Regression Safety Net (complete)
-Plan: 04-01-PLAN.md complete
-Status: Milestone complete
-Last activity: 2026-09-05 — Phase 04 finished: smoke tests for hold gesture/target-weight/session bar added, `npm test` + `npm run lint` + `npm run build` all clean
+Milestone: v1.1 — Smart Set Flow
+Phase: 5 of 6 overall (1 of 2 in this milestone) — Fast Set Entry
+Plan: Not yet planned (context captured; ready for UI-SPEC then task-level PLAN.md)
+Status: Planning
+Last activity: 2026-09-05 — Discussion completed via user Q&A (rest-set shape, superset auto-advance, input auto-progress all decided); Phase 5 (Fast Set Entry) and Phase 6 (Structured Sets — Rest Rows & Superset Merge, 2 plans) CONTEXT.md + DISCUSSION-LOG.md written; REQUIREMENTS.md and ROADMAP.md updated with 11 new requirements
 
-Progress: [██████████] 100%
+Progress: [███████░░░] 67% (4/6 phases — v1.0 complete, v1.1 phases 5-6 not started)
 
 ## Performance Metrics
 
@@ -51,6 +52,8 @@ Progress: [██████████] 100%
 | 02 | 2 | - | - |
 | 03 | 1 | - | - |
 | 04 | 1 | ~35 min | ~35 min |
+| 05 | TBD | - | - |
+| 06 | TBD (2 plans) | - | - |
 
 **Recent Trend:**
 
@@ -72,10 +75,14 @@ Recent decisions affecting current work:
 - Post-milestone: Phase 3's deferred drag-gesture backgrounding finding fixed rather than left open indefinitely
 - Post-milestone: test coverage extended to schedule.js/csvImport.js/selectors.js beyond Phase 4's required scope (per CONCERNS.md's fragility flags)
 - Post-milestone: React error boundary added around the route tree (console-only logging, no crash-reporting SDK — app is offline/local-only)
+- Post-milestone: corrupted localStorage blob is now backed up instead of silently destroyed on the next save
+- v1.1: rest becomes an explicit, individually-editable row in a block's set sequence (not just a per-block toggle) — user's explicit choice over the smaller alternative
+- v1.1: merged supersets auto-advance and render as one interleaved flow in Active Workout (not manual tab-switching) — user's explicit choice, confirmed as "the bigger, more involved change" before proceeding
+- v1.1: fast set entry does both auto-advance-focus AND auto-mark-done (user selected "both" over either alone)
 
 ### Pending Todos
 
-None yet.
+- v1.1 Phase 5 (Fast Set Entry) and Phase 6 (Structured Sets) are context-captured but not yet UI-SPEC'd or task-planned — next step before execution.
 
 ### Blockers/Concerns
 
@@ -95,6 +102,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-05T10:15:00.000Z
-Stopped at: Phase 04 verified, milestone v1.0 complete
-Resume file: .planning/phases/04-test-suite-regression-safety-net/04-VERIFICATION.md
+Last session: 2026-09-05T11:00:00.000Z
+Stopped at: v1.1 Phases 5-6 context captured, ready for UI-SPEC/planning
+Resume file: .planning/phases/06-structured-sets/06-CONTEXT.md (larger/riskier of the two — read first)
