@@ -16,7 +16,7 @@ function buildInitialState() {
   }
   return {
     settings: initialSettings(),
-    user: { name: 'Marcus' },
+    user: { name: 'Athlete' },
     customExercises: [],
     exerciseNotes: {},
     importPresets: [],
