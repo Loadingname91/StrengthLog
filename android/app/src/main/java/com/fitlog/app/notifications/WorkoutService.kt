@@ -5,11 +5,19 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.media.MediaPlayer
 import android.media.RingtoneManager
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
@@ -33,6 +41,7 @@ class WorkoutService : Service() {
         const val ACTION_STOP = "com.fitlog.app.notifications.ACTION_STOP"
         const val ACTION_SKIP_REST = "com.fitlog.app.notifications.ACTION_SKIP_REST"
         const val ACTION_ADD_15S = "com.fitlog.app.notifications.ACTION_ADD_15S"
+        const val ACTION_FINISH_TAPPED = "com.fitlog.app.notifications.ACTION_FINISH_TAPPED"
 
         const val EXTRA_WORKOUT_ID = "workoutId"
         const val EXTRA_EXERCISE_NAME = "exerciseName"
@@ -66,6 +75,11 @@ class WorkoutService : Service() {
     private var restRunnable: Runnable? = null
     private var armedForRestUntil: Long = 0L
     private val handler = Handler(Looper.getMainLooper())
+
+    // Only ever populated on API 26+ (see playDuckedDing/abandonDuckingFocus) —
+    // the field itself is safe to declare unconditionally since it's nullable
+    // and never instantiated below O.
+    private var audioFocusRequest: AudioFocusRequest? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -101,6 +115,7 @@ class WorkoutService : Service() {
         when (intent.action) {
             ACTION_SKIP_REST -> handleSkipRest()
             ACTION_ADD_15S -> handleAdd15s()
+            ACTION_FINISH_TAPPED -> handleFinishTapped()
             else -> rescheduleRestAlarmIfNeeded()
         }
 
@@ -123,18 +138,21 @@ class WorkoutService : Service() {
         if (intent.hasExtra(EXTRA_NOTIFY_REST_DONE)) notifyRestDone = intent.getBooleanExtra(EXTRA_NOTIFY_REST_DONE, true)
     }
 
-    private fun openAppPendingIntent(): PendingIntent {
-        // Named directly rather than via packageManager.getLaunchIntentForPackage
-        // (which returns a nullable Intent) — MainActivity's own
-        // launchMode="singleTask" (manifest) means this resumes the existing
-        // instance instead of creating a new one.
-        val intent = Intent(this, MainActivity::class.java).apply {
+    // Named directly rather than via packageManager.getLaunchIntentForPackage
+    // (which returns a nullable Intent) — MainActivity's own
+    // launchMode="singleTask" (manifest) means this resumes the existing
+    // instance instead of creating a new one. Factored out so
+    // handleFinishTapped() can also call startActivity() with it directly.
+    private fun appLaunchIntent(): Intent =
+        Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
+
+    private fun openAppPendingIntent(): PendingIntent {
         return PendingIntent.getActivity(
             this,
             0,
-            intent,
+            appLaunchIntent(),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
     }
@@ -172,10 +190,10 @@ class WorkoutService : Service() {
                 .setUsesChronometer(true)
                 .setChronometerCountDown(false)
                 .setWhen(startedAt)
-                // Placeholder until Phase 9 (NOTIF-15) deep-links this into
-                // the real finish-confirmation flow — opening the app is the
-                // correct interim behavior, not a native "finish".
-                .addAction(R.drawable.ic_stat_workout, "Finish", openAppPendingIntent())
+                // Routes through the service (not a direct openAppPendingIntent)
+                // so the tap is durably recorded via the same pending-action
+                // pipeline as Skip/+15s — see handleFinishTapped().
+                .addAction(R.drawable.ic_stat_workout, "Finish", pendingIntentForAction(ACTION_FINISH_TAPPED, 3))
         }
 
         return builder.build()
@@ -226,12 +244,18 @@ class WorkoutService : Service() {
         cancelRestAlarm()
         if (notifyRestDone) {
             postRestDoneAlert()
+            playDuckedDing()
+            vibrateForRestDone()
         }
         restUntil = 0L
         restTotalSec = 0
         postOngoingNotification()
     }
 
+    // Visual only — sound/vibration are owned entirely by playDuckedDing()/
+    // vibrateForRestDone() below (Phase 9, NOTIF-16), not the channel or
+    // this builder. setSilent(true) suppresses both uniformly across API
+    // levels so nothing plays twice.
     private fun postRestDoneAlert() {
         val builder = NotificationCompat.Builder(this, NotificationChannels.REST_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_workout)
@@ -239,12 +263,83 @@ class WorkoutService : Service() {
             .setContentText(exerciseName?.let { "Back to $it" } ?: "Time for your next set")
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            // Pre-Android-8 fallback only — ignored on API 26+ in favor of
-            // fitlog_rest_v1's own (already HIGH-importance, vibrating)
-            // channel settings from Phase 7.
-            .setVibrate(longArrayOf(0, 300, 200, 300))
-            .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+            .setSilent(true)
         NotificationManagerCompat.from(this).notify(NOTIF_ID_REST_DONE, builder.build())
+    }
+
+    // NOTIF-16: plays through the app's own audio focus request
+    // (AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK) so concurrent music (Spotify,
+    // etc.) ducks instead of being talked over or drowning out the ding —
+    // the channel-default notification sound this replaced did neither.
+    private fun playDuckedDing() {
+        val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+        val attrs = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ALARM)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                .setAudioAttributes(attrs)
+                .build()
+            audioFocusRequest = request
+            audioManager.requestAudioFocus(request)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(
+                AudioManager.OnAudioFocusChangeListener {},
+                AudioManager.STREAM_ALARM,
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+            )
+        }
+
+        val player = MediaPlayer()
+        try {
+            player.setAudioAttributes(attrs)
+            player.setDataSource(this, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+            player.setOnCompletionListener {
+                it.release()
+                abandonDuckingFocus()
+            }
+            player.prepare()
+            player.start()
+        } catch (e: Exception) {
+            player.release()
+            abandonDuckingFocus()
+        }
+    }
+
+    private fun abandonDuckingFocus() {
+        val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+            audioFocusRequest = null
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(AudioManager.OnAudioFocusChangeListener {})
+        }
+    }
+
+    // NOTIF-16: explicit Vibrator call with USAGE_ALARM, not channel-default
+    // vibration — unaffected by the user's own per-channel vibration tweaks.
+    private fun vibrateForRestDone() {
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(VIBRATOR_SERVICE) as Vibrator
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // VibrationEffect.createWaveform is API 26+ — this call must stay
+            // inside the branch, not hoisted above it, or it would resolve
+            // (and crash) unconditionally on API 24-25 devices too.
+            val effect = VibrationEffect.createWaveform(longArrayOf(0, 300, 200, 300), -1)
+            val attrs = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build()
+            vibrator.vibrate(effect, attrs)
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(longArrayOf(0, 300, 200, 300), -1)
+        }
     }
 
     private fun handleSkipRest() {
@@ -266,6 +361,18 @@ class WorkoutService : Service() {
         armRestAlarm(restUntil - now, restUntil)
         enqueueAndEmit("REST_ADJUST", 15)
         postOngoingNotification()
+    }
+
+    private fun handleFinishTapped() {
+        // Durably records the tap through the exact same pipeline Skip/+15s
+        // already use (Phase 8) — 09-02's JS drains/listens for it the same
+        // way, setting a finishRequested flag rather than finishing the
+        // workout natively (this service has none of FINISH_WORKOUT's
+        // volume/PR/session-building logic). startActivity is separate:
+        // a PendingIntent.getService() tap alone never brings the app to
+        // the foreground on its own.
+        enqueueAndEmit("FINISH_TAPPED", 0)
+        startActivity(appLaunchIntent())
     }
 
     private fun enqueueAndEmit(type: String, payload: Int) {

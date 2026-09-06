@@ -21,6 +21,11 @@ object PendingActionStore {
     private const val PREFS = "fitlog_pending_actions"
     private const val KEY = "queue"
 
+    // A workout nobody ever reopens (app uninstalled mid-session, or just
+    // never resumed) should not let this queue grow without bound — keeps
+    // the most recent MAX_QUEUE_SIZE entries, drops the oldest first.
+    private const val MAX_QUEUE_SIZE = 50
+
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     private fun readArray(context: Context): JSONArray {
@@ -34,7 +39,7 @@ object PendingActionStore {
 
     @Synchronized
     fun enqueue(context: Context, action: PendingAction) {
-        val arr = readArray(context)
+        var arr = readArray(context)
         arr.put(
             JSONObject().apply {
                 put("id", action.id)
@@ -44,6 +49,12 @@ object PendingActionStore {
                 put("at", action.at)
             }
         )
+        if (arr.length() > MAX_QUEUE_SIZE) {
+            val trimmed = JSONArray()
+            val dropCount = arr.length() - MAX_QUEUE_SIZE
+            for (i in dropCount until arr.length()) trimmed.put(arr.getJSONObject(i))
+            arr = trimmed
+        }
         prefs(context).edit().putString(KEY, arr.toString()).apply()
     }
 
