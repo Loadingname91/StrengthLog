@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook } from '@testing-library/react'
+import { renderHook, act } from '@testing-library/react'
 import { useWorkoutNotifications } from './useWorkoutNotifications'
 import { reducer } from './reducer'
 
@@ -7,11 +7,14 @@ vi.mock('../lib/nativeNotifications', () => ({
   ensureChannels: vi.fn(),
   requestNotificationPermission: vi.fn(),
   checkNotificationPermission: vi.fn(),
-  startWorkout: vi.fn(),
+  startWorkout: vi.fn(() => Promise.resolve(false)),
   updateWorkout: vi.fn(),
   stopWorkout: vi.fn(),
   notifyPR: vi.fn(),
   scheduleReminders: vi.fn(),
+  drainPendingActions: vi.fn(),
+  onWorkoutAction: vi.fn(() => Promise.resolve({ remove: vi.fn() })),
+  ackAction: vi.fn(),
 }))
 import * as native from '../lib/nativeNotifications'
 
@@ -51,13 +54,19 @@ function sampleRoutine(id = 'r1') {
 }
 
 // Wraps renderHook so each call re-renders with a fresh state snapshot,
-// mirroring how StoreProvider re-renders the hook after every dispatch.
+// mirroring how StoreProvider re-renders the hook after every dispatch. The
+// hook's own dispatch calls (effect A's fallback flag, effect E's drained
+// actions) are wired through this exact same apply/rerender loop, so they
+// behave identically to externally-applied test actions.
 function renderNotifications(initial) {
   let state = initial
-  const view = renderHook(({ s }) => useWorkoutNotifications(s, []), { initialProps: { s: state } })
-  function apply(action) {
+  function dispatch(action) {
     state = reducer(state, action)
     view.rerender({ s: state })
+  }
+  const view = renderHook(({ s }) => useWorkoutNotifications(s, dispatch, []), { initialProps: { s: state } })
+  function apply(action) {
+    dispatch(action)
     return state
   }
   return { apply, getState: () => state }
@@ -106,6 +115,18 @@ describe('useWorkoutNotifications — lifecycle (effect A)', () => {
     renderNotifications(started)
 
     expect(native.startWorkout).toHaveBeenCalledTimes(1)
+  })
+
+  it('dispatches a fallback flag once startWorkout resolves (denied permission or the setting turned off)', async () => {
+    const routine = sampleRoutine()
+    native.startWorkout.mockResolvedValueOnce(true)
+    const { apply, getState } = renderNotifications(baseState({ routines: [routine], routineOrder: [routine.id] }))
+
+    await act(async () => {
+      apply({ type: 'START_WORKOUT', payload: { routineId: routine.id } })
+    })
+
+    expect(getState().activeWorkout.notifFallback).toBe(true)
   })
 })
 
@@ -177,5 +198,57 @@ describe('useWorkoutNotifications — reminders (effect D)', () => {
     apply({ type: 'START_WORKOUT', payload: { routineId: routine.id } })
     apply({ type: 'SET_SET_FIELD', payload: { exerciseIndex: 0, setIndex: 0, field: 'weight', value: '60' } })
     expect(native.scheduleReminders).not.toHaveBeenCalled()
+  })
+})
+
+describe('useWorkoutNotifications — pending action drain (effect E)', () => {
+  it('drains once and subscribes to the live event once, on mount', () => {
+    const routine = sampleRoutine()
+    renderNotifications(baseState({ routines: [routine], routineOrder: [routine.id] }))
+
+    expect(native.drainPendingActions).toHaveBeenCalledTimes(1)
+    expect(native.onWorkoutAction).toHaveBeenCalledTimes(1)
+  })
+
+  it('applies a drained action for the active workout, and drops one for a different workoutId', async () => {
+    const routine = sampleRoutine()
+    let started = reducer(baseState({ routines: [routine], routineOrder: [routine.id] }), { type: 'START_WORKOUT', payload: { routineId: routine.id } })
+    const restUntil = new Date(Date.now() + 60_000).toISOString()
+    started = { ...started, activeWorkout: { ...started.activeWorkout, restUntil, restTotalSec: 90 } }
+    const workoutId = started.activeWorkout.id
+
+    // Mirrors the real drainPendingActions' shape: an await (there, the
+    // native getPending() call) before apply() ever runs, so these calls
+    // land as a microtask after the initial mount — not synchronously
+    // inside it, when the render-hook view handle doesn't exist yet.
+    native.drainPendingActions.mockImplementationOnce(async (apply) => {
+      await Promise.resolve()
+      apply({ workoutId: 'some-other-workout-id', type: 'REST_ADJUST', payload: 15 })
+      apply({ workoutId, type: 'REST_ADJUST', payload: 15 })
+    })
+
+    let harness
+    await act(async () => {
+      harness = renderNotifications(started)
+    })
+
+    // 90 + 15 once: proves the mismatched workoutId was dropped (it would
+    // be 105 either way if dropped, or 120 if it had wrongly applied twice).
+    expect(harness.getState().activeWorkout.restTotalSec).toBe(105)
+  })
+
+  it('acks and applies a live workoutAction event the same way', () => {
+    const routine = sampleRoutine()
+    let started = reducer(baseState({ routines: [routine], routineOrder: [routine.id] }), { type: 'START_WORKOUT', payload: { routineId: routine.id } })
+    started = { ...started, activeWorkout: { ...started.activeWorkout, restUntil: new Date(Date.now() + 60_000).toISOString(), restTotalSec: 90 } }
+    const workoutId = started.activeWorkout.id
+
+    const { getState } = renderNotifications(started)
+    const liveHandler = native.onWorkoutAction.mock.calls[0][0]
+
+    liveHandler({ id: 'a1', workoutId, type: 'REST_SKIP', payload: 0 })
+
+    expect(getState().activeWorkout.restUntil).toBeNull()
+    expect(native.ackAction).toHaveBeenCalledWith('a1')
   })
 })

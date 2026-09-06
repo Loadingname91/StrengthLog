@@ -49,7 +49,7 @@ export function StoreProvider({ children }) {
   }, [state])
 
   const exercises = useMemo(() => allExercises(state), [state])
-  useWorkoutNotifications(state, exercises)
+  useWorkoutNotifications(state, dispatch, exercises)
 
   useEffect(() => {
     const root = document.documentElement

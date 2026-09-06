@@ -21,9 +21,19 @@ function countTotal(unit) {
 // instead of on `activeWorkout` itself means typing into a field never
 // re-runs these effects or reaches the native bridge — only an actual
 // lifecycle/rest/PR change does.
-export function useWorkoutNotifications(state, exercises) {
+export function useWorkoutNotifications(state, dispatch, exercises) {
   const aw = state.activeWorkout
   const awId = aw?.id ?? null
+
+  // Read fresh inside effect A/E's stable closures without adding `state`
+  // to their dependency arrays (which would re-run them on every change
+  // instead of only on the transitions each actually cares about). Synced
+  // in its own effect, not during render — a ref write belongs after
+  // commit, not in the render body.
+  const stateRef = useRef(state)
+  useEffect(() => {
+    stateRef.current = state
+  })
   const restUntil = aw?.restUntil ?? null
   const restTotal = aw?.restTotalSec ?? null
   const currentUnit = aw ? aw.exercises[aw.currentIndex] : null
@@ -62,14 +72,26 @@ export function useWorkoutNotifications(state, exercises) {
   // permission here (rather than a specific "Start Workout" button) covers
   // every entry point that begins a workout — Home's card and
   // WorkoutOverview's — with one line instead of two.
+  // startedAt/notifyOngoing are read via stateRef, not the closure, so
+  // they're exempt from dependency tracking (same reasoning as effect E
+  // below) — deliberately: starting/stopping is tied to a workout
+  // beginning or ending, not a reactive response to the setting changing
+  // mid-workout (the same deliberate [awId]-only scope this effect already
+  // had for permission requests).
   useEffect(() => {
     if (awId) {
-      native.startWorkout({ workoutId: awId })
-      native.requestNotificationPermission()
+      const current = stateRef.current
+      native.startWorkout({
+        workoutId: awId,
+        startedAt: current.activeWorkout.startedAt,
+        notifyOngoing: current.settings.notifyOngoing,
+      }).then((fallback) => {
+        dispatch({ type: 'SET_NOTIF_FALLBACK', payload: fallback })
+      })
     } else {
       native.stopWorkout()
     }
-  }, [awId])
+  }, [awId, dispatch])
 
   // B — content.
   useEffect(() => {
@@ -106,4 +128,25 @@ export function useWorkoutNotifications(state, exercises) {
     })
     native.scheduleReminders(plan)
   }, [notifyReminders, reminderTime, routineOrder, sequenceIndex, routines, weekdayAssignments, sessions, scheduleRestartAt, createdAt])
+
+  // E — pending native action drain. A Skip/+15s tap applied to the
+  // notification while the app was backgrounded or killed reaches the
+  // reducer through here: WorkoutService (Phase 8) applies it to its own
+  // state immediately and queues it durably; this drains that queue once
+  // on mount (covering a killed-and-restarted process) and listens for the
+  // same event live (the fast path, while the WebView is already alive) —
+  // both funnel into the exact REST_ADJUST/REST_SKIP actions the in-app
+  // Skip/+15s controls already dispatch.
+  useEffect(() => {
+    function apply(a) {
+      if (a.workoutId !== stateRef.current.activeWorkout?.id) return
+      dispatch(a.type === 'REST_SKIP' ? { type: 'REST_SKIP' } : { type: 'REST_ADJUST', payload: a.payload })
+    }
+    native.drainPendingActions(apply)
+    const subPromise = native.onWorkoutAction((a) => {
+      apply(a)
+      native.ackAction(a.id)
+    })
+    return () => { subPromise.then((sub) => sub.remove()) }
+  }, [dispatch])
 }

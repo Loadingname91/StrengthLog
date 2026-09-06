@@ -125,6 +125,12 @@ export default function ActiveWorkout() {
           </div>
         </div>
 
+        {aw.notifFallback && (
+          <div className="mx-[18px] mt-1.5 rounded-xl p-2.5 text-xs" style={{ background: 'var(--surface-alt)', color: 'var(--muted)' }}>
+            Notifications are blocked, so rest alerts only work while this screen stays open. Enable them in Settings or your system notification settings.
+          </div>
+        )}
+
         <div className="no-scrollbar flex gap-2 overflow-x-auto px-[18px] pb-2.5 pt-1.5">
           {aw.exercises.map((ex, i) => {
             const done = ex.sets.every((s) => s.done)

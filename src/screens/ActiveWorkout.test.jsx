@@ -294,3 +294,15 @@ describe('RestRow active state', () => {
     }
   })
 })
+
+describe('Notification fallback banner (Phase 8, NOTIF-13)', () => {
+  it('shows the banner when notifFallback is set, hides it otherwise', () => {
+    renderWorkout({ ...twoSetWorkout(), notifFallback: true })
+    expect(screen.getByText(/Notifications are blocked/)).toBeInTheDocument()
+  })
+
+  it('does not render the banner when notifFallback is absent', () => {
+    renderWorkout(twoSetWorkout())
+    expect(screen.queryByText(/Notifications are blocked/)).not.toBeInTheDocument()
+  })
+})

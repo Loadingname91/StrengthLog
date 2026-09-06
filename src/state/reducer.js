@@ -252,6 +252,14 @@ export function reducer(state, action) {
       if (!state.activeWorkout) return state
       return { ...state, activeWorkout: { ...state.activeWorkout, restUntil: null, restExerciseIndex: null, restSetIndex: null, restTotalSec: null } }
 
+    // Workout-scoped, like lastPR — cleared implicitly when activeWorkout
+    // resets to null. Set by useWorkoutNotifications.js's effect A once
+    // startWorkout() resolves, so ActiveWorkout can show a banner when
+    // notification permission is denied (NOTIF-13).
+    case 'SET_NOTIF_FALLBACK':
+      if (!state.activeWorkout) return state
+      return { ...state, activeWorkout: { ...state.activeWorkout, notifFallback: action.payload } }
+
     case 'FINISH_WORKOUT': {
       const aw = state.activeWorkout
       if (!aw) return state

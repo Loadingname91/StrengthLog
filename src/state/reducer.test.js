@@ -291,3 +291,22 @@ describe('REST_ADJUST / REST_SKIP', () => {
     expect(skipped.activeWorkout.restTotalSec).toBeNull()
   })
 })
+
+describe('SET_NOTIF_FALLBACK', () => {
+  it('sets the flag on the active workout when a workout is active', () => {
+    const routine = sampleRoutine()
+    const started = reducer(baseState({ routines: [routine], routineOrder: [routine.id] }), { type: 'START_WORKOUT', payload: { routineId: routine.id } })
+
+    const flagged = reducer(started, { type: 'SET_NOTIF_FALLBACK', payload: true })
+    expect(flagged.activeWorkout.notifFallback).toBe(true)
+
+    const cleared = reducer(flagged, { type: 'SET_NOTIF_FALLBACK', payload: false })
+    expect(cleared.activeWorkout.notifFallback).toBe(false)
+  })
+
+  it('is a no-op when there is no active workout', () => {
+    const state = baseState()
+    const next = reducer(state, { type: 'SET_NOTIF_FALLBACK', payload: true })
+    expect(next).toBe(state)
+  })
+})

@@ -1,10 +1,14 @@
-import { Capacitor } from '@capacitor/core'
+import { Capacitor, registerPlugin } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { REMINDER_ID } from './reminderPlan'
 
 function isNative() {
   return Capacitor.isNativePlatform()
 }
+
+// Phase 8's custom foreground service — local/custom, registered natively
+// via MainActivity.registerPlugin, not an npm package.
+const WorkoutNotification = registerPlugin('WorkoutNotification')
 
 // Fixed ids so a reschedule always replaces the same notification instead of
 // accumulating duplicates. There's ever at most one rest countdown active,
@@ -18,11 +22,18 @@ const PR_ID = 7001
 // reminders" settings screen the first time it's needed — a jarring, easy
 // to trigger accidentally surprise for what's meant to be a lightweight
 // rest-timer ping. Explicitly false everywhere: precision for the rest
-// alert is Phase 2's foreground-service timer's job (a wake lock, not an
+// alert is Phase 8's foreground-service timer's job (a wake lock, not an
 // alarm), and a reminder firing within a ten-minute window is fine.
 const INEXACT = { isExactNotification: false }
 
-let lastRestUntil = null
+// True once WorkoutNotification.start() has actually been called and
+// succeeded — guards updateWorkout()/stopWorkout() from calling into a
+// service that was never started (permission denied, or the user turned
+// off Settings' "Ongoing workout notification"). Without this,
+// Context.startService() would silently bring the foreground service up
+// as a side effect of an unrelated content update — exactly what a denied
+// permission must never do.
+let serviceActive = false
 
 export async function ensureChannels() {
   if (!isNative()) return
@@ -43,38 +54,74 @@ export async function requestNotificationPermission() {
   return display
 }
 
-export function startWorkout(_payload) {
-  if (!isNative()) return
-  // Phase 2: the real ongoing notification, backed by a foreground service.
+// Starts the real foreground service (Phase 8) unless the user turned the
+// ongoing notification off entirely, or notification permission is denied —
+// in which case it returns true so the caller can show a fallback banner
+// (the in-app beep already fires regardless, unconditionally, elsewhere).
+// Requesting permission here (rather than a separate call) means the
+// decision and the request happen together, atomically, before anything
+// else can act on a stale result.
+export async function startWorkout(payload) {
+  if (!isNative()) return false
+  serviceActive = false
+  if (!payload.notifyOngoing) return false
+  const display = await requestNotificationPermission()
+  if (display !== 'granted') return true
+  await WorkoutNotification.start({ workoutId: payload.workoutId, startedAt: payload.startedAt })
+  serviceActive = true
+  return false
 }
 
-// Provisional rest-done alert until Phase 2 replaces it with an in-process
-// timer under a wake lock, immune to Doze. A scheduled OS notification can
-// drift under battery optimization — accepted for now, and strictly better
-// than today's alert, which is silent unless the /workout screen is open.
 export function updateWorkout(payload) {
-  if (!isNative()) return
-  if (payload.restUntil === lastRestUntil) return
-  lastRestUntil = payload.restUntil
-  LocalNotifications.cancel({ notifications: [{ id: REST_DONE_ID }] })
-  if (payload.restUntil && payload.notifyRestDone) {
-    LocalNotifications.schedule({
-      notifications: [{
-        id: REST_DONE_ID,
-        title: 'Rest done',
-        body: payload.exerciseName ? `Back to ${payload.exerciseName}` : 'Time for your next set',
-        schedule: { at: new Date(payload.restUntil), ...INEXACT },
-        channelId: 'fitlog_rest_v1',
-        autoCancel: true,
-      }],
-    })
-  }
+  if (!isNative() || !serviceActive) return
+  WorkoutNotification.update({
+    workoutId: payload.workoutId,
+    exerciseName: payload.exerciseName,
+    setsDone: payload.setsDone,
+    setsTotal: payload.setsTotal,
+    // Crosses the bridge as epoch millis, not the ISO string the reducer
+    // stores restUntil as — keeps date parsing entirely on this side, so
+    // the native service never needs anything beyond a plain Long.
+    restUntilMs: payload.restUntil ? new Date(payload.restUntil).getTime() : 0,
+    restTotalSec: payload.restTotalSec || 0,
+    notifyRestDone: payload.notifyRestDone,
+  })
 }
 
 export function stopWorkout() {
   if (!isNative()) return
-  lastRestUntil = null
+  // Unconditional and first: cleans up a stray Phase-7-era scheduled
+  // notification if one were somehow still pending from before this phase.
   LocalNotifications.cancel({ notifications: [{ id: REST_DONE_ID }] })
+  if (!serviceActive) return
+  serviceActive = false
+  WorkoutNotification.stop()
+}
+
+// Pending-action drain: applies (and acks) every Skip/+15s tap the service
+// queued while this WebView may not have been alive to receive it live.
+// `apply` is the caller's own guarded dispatch (see useWorkoutNotifications.js
+// effect E) — this function only owns draining and acking, not the
+// workoutId-match/dispatch decision.
+export async function drainPendingActions(apply) {
+  if (!isNative()) return
+  const { actions } = await WorkoutNotification.getPending()
+  for (const a of actions) {
+    apply(a)
+    await WorkoutNotification.ack({ id: a.id })
+  }
+}
+
+// The fast path: live while this WebView is already running. Returns the
+// listener-handle promise as-is so the caller can remove() it on cleanup.
+export function onWorkoutAction(handler) {
+  if (!isNative()) return Promise.resolve({ remove: () => {} })
+  return WorkoutNotification.addListener('workoutAction', handler)
+}
+
+export function ackAction(id) {
+  if (!isNative()) return
+  WorkoutNotification.ack({ id })
 }
 
 // Posted only when the app isn't in the foreground — ActiveWorkout already
