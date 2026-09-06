@@ -310,3 +310,22 @@ describe('SET_NOTIF_FALLBACK', () => {
     expect(next).toBe(state)
   })
 })
+
+describe('SET_FINISH_REQUESTED', () => {
+  it('sets the flag on the active workout when a workout is active', () => {
+    const routine = sampleRoutine()
+    const started = reducer(baseState({ routines: [routine], routineOrder: [routine.id] }), { type: 'START_WORKOUT', payload: { routineId: routine.id } })
+
+    const flagged = reducer(started, { type: 'SET_FINISH_REQUESTED', payload: true })
+    expect(flagged.activeWorkout.finishRequested).toBe(true)
+
+    const cleared = reducer(flagged, { type: 'SET_FINISH_REQUESTED', payload: false })
+    expect(cleared.activeWorkout.finishRequested).toBe(false)
+  })
+
+  it('is a no-op when there is no active workout', () => {
+    const state = baseState()
+    const next = reducer(state, { type: 'SET_FINISH_REQUESTED', payload: true })
+    expect(next).toBe(state)
+  })
+})

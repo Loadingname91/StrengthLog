@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { App as CapacitorApp } from '@capacitor/app'
 import { exerciseById, unitName } from '../lib/exercises'
 import { buildReminderPlan } from '../lib/reminderPlan'
 import * as native from '../lib/nativeNotifications'
@@ -129,24 +130,36 @@ export function useWorkoutNotifications(state, dispatch, exercises) {
     native.scheduleReminders(plan)
   }, [notifyReminders, reminderTime, routineOrder, sequenceIndex, routines, weekdayAssignments, sessions, scheduleRestartAt, createdAt])
 
-  // E — pending native action drain. A Skip/+15s tap applied to the
+  // E — pending native action drain. A Skip/+15s/Finish tap applied to the
   // notification while the app was backgrounded or killed reaches the
-  // reducer through here: WorkoutService (Phase 8) applies it to its own
-  // state immediately and queues it durably; this drains that queue once
-  // on mount (covering a killed-and-restarted process) and listens for the
-  // same event live (the fast path, while the WebView is already alive) —
-  // both funnel into the exact REST_ADJUST/REST_SKIP actions the in-app
-  // Skip/+15s controls already dispatch.
+  // reducer through here: WorkoutService (Phase 8) applies Skip/+15s to its
+  // own state immediately and queues every action durably; this drains that
+  // queue on mount (covering a killed-and-restarted process), again on
+  // Capacitor's `resume` event (Phase 9 — covers the app merely being
+  // backgrounded with a frozen, not fully killed, WebView, which a
+  // mount-only drain would miss), and listens for the same event live (the
+  // fast path, while the WebView is already alive). All three funnel
+  // through one guarded apply(): REST_SKIP/REST_ADJUST reuse the exact
+  // actions the in-app Skip/+15s controls already dispatch; FINISH_TAPPED
+  // sets a flag ActiveWorkout.jsx's own finish() logic interprets, since
+  // whether a confirmation is needed is that screen's decision, not this
+  // effect layer's.
   useEffect(() => {
     function apply(a) {
       if (a.workoutId !== stateRef.current.activeWorkout?.id) return
-      dispatch(a.type === 'REST_SKIP' ? { type: 'REST_SKIP' } : { type: 'REST_ADJUST', payload: a.payload })
+      if (a.type === 'REST_SKIP') dispatch({ type: 'REST_SKIP' })
+      else if (a.type === 'REST_ADJUST') dispatch({ type: 'REST_ADJUST', payload: a.payload })
+      else if (a.type === 'FINISH_TAPPED') dispatch({ type: 'SET_FINISH_REQUESTED', payload: true })
     }
     native.drainPendingActions(apply)
-    const subPromise = native.onWorkoutAction((a) => {
+    const resumeSubPromise = CapacitorApp.addListener('resume', () => native.drainPendingActions(apply))
+    const actionSubPromise = native.onWorkoutAction((a) => {
       apply(a)
       native.ackAction(a.id)
     })
-    return () => { subPromise.then((sub) => sub.remove()) }
+    return () => {
+      resumeSubPromise.then((sub) => sub.remove())
+      actionSubPromise.then((sub) => sub.remove())
+    }
   }, [dispatch])
 }

@@ -123,6 +123,11 @@ export default function Settings() {
               </>
             )}
           </Card>
+          {state.settings.notifyOngoing && (
+            <div className="mt-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+              Some phones aggressively kill background apps to save battery. If the ongoing notification disappears mid-workout, check your phone's battery settings (Settings → Apps → FitLog → Battery) and set it to "Unrestricted."
+            </div>
+          )}
         </div>
       )}
 

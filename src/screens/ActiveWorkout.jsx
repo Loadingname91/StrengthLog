@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../state/StoreContext'
 import ConfirmSheet from '../components/ConfirmSheet'
@@ -25,7 +25,7 @@ export default function ActiveWorkout() {
   const { state, dispatch, exercises } = useStore()
   const navigate = useNavigate()
   const aw = state.activeWorkout
-  const [now, setNow] = useState(Date.now())
+  const [now, setNow] = useState(() => Date.now())
   const [confirmFinish, setConfirmFinish] = useState(false)
   const [helpFor, setHelpFor] = useState(null)
   const [prBadge, setPrBadge] = useState(null)
@@ -33,6 +33,27 @@ export default function ActiveWorkout() {
   const finishingRef = useRef(false)
   const weightRefs = useRef({})
   const repsRefs = useRef({})
+
+  // Hoisted above the `if (!aw) return null` guard below (null-guarded
+  // here) so the finishRequested effect — a hook, which the Rules of Hooks
+  // forbid placing after a conditional return — can call the exact same
+  // finish() the in-app Finish button uses, rather than duplicating its
+  // confirm-sheet-or-finish decision.
+  const allSetsLogged = aw ? aw.exercises.every((ex) => ex.sets.every((s) => s.done)) : false
+
+  // useCallback (not plain functions) specifically so the finishRequested
+  // effect below can list `finish` in its dependency array correctly,
+  // rather than either omitting it or re-running on every render.
+  const doFinish = useCallback(() => {
+    finishingRef.current = true
+    dispatch({ type: 'FINISH_WORKOUT', payload: { note: '' } })
+    navigate('/workout/summary')
+  }, [dispatch, navigate])
+
+  const finish = useCallback(() => {
+    if (!allSetsLogged) { setConfirmFinish(true); return }
+    doFinish()
+  }, [allSetsLogged, doFinish])
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000)
@@ -71,6 +92,16 @@ export default function ActiveWorkout() {
     if (!aw && !finishingRef.current) navigate('/routines', { replace: true })
   }, [aw, navigate])
 
+  // Notification "Finish" tap (Phase 9, NOTIF-15) — App.jsx's Shell already
+  // navigated here if this screen wasn't already showing. Clear the flag
+  // before calling finish(), not after, so a finish() that itself triggers
+  // FINISH_WORKOUT can never re-enter this branch with a stale-true flag.
+  useEffect(() => {
+    if (!aw?.finishRequested) return
+    dispatch({ type: 'SET_FINISH_REQUESTED', payload: false })
+    finish()
+  }, [aw?.finishRequested, finish, dispatch])
+
   if (!aw) return null
 
   const elapsedSec = Math.floor((now - new Date(aw.startedAt).getTime()) / 1000)
@@ -95,18 +126,6 @@ export default function ActiveWorkout() {
     ? (prExercise.blockType === 'superset' ? prExercise.exerciseIds[prExercise.sets[prBadge.setIndex]?.exerciseIndex] : prExercise.exerciseId)
     : null
   const prVisible = !!prExercise
-
-  const allSetsLogged = aw.exercises.every((ex) => ex.sets.every((s) => s.done))
-
-  function finish() {
-    if (!allSetsLogged) { setConfirmFinish(true); return }
-    doFinish()
-  }
-  function doFinish() {
-    finishingRef.current = true
-    dispatch({ type: 'FINISH_WORKOUT', payload: { note: '' } })
-    navigate('/workout/summary')
-  }
 
   const circumference = 2 * Math.PI * 24
   const ringOffset = restTotal > 0 ? circumference * (1 - restRemaining / restTotal) : 0

@@ -3,6 +3,11 @@ import { renderHook, act } from '@testing-library/react'
 import { useWorkoutNotifications } from './useWorkoutNotifications'
 import { reducer } from './reducer'
 
+vi.mock('@capacitor/app', () => ({
+  App: { addListener: vi.fn(() => Promise.resolve({ remove: vi.fn() })) },
+}))
+import { App as CapacitorApp } from '@capacitor/app'
+
 vi.mock('../lib/nativeNotifications', () => ({
   ensureChannels: vi.fn(),
   requestNotificationPermission: vi.fn(),
@@ -250,5 +255,60 @@ describe('useWorkoutNotifications — pending action drain (effect E)', () => {
 
     expect(getState().activeWorkout.restUntil).toBeNull()
     expect(native.ackAction).toHaveBeenCalledWith('a1')
+  })
+
+  it('registers a resume listener once on mount, and a resume re-drains', () => {
+    const routine = sampleRoutine()
+    renderNotifications(baseState({ routines: [routine], routineOrder: [routine.id] }))
+
+    expect(CapacitorApp.addListener).toHaveBeenCalledTimes(1)
+    expect(CapacitorApp.addListener).toHaveBeenCalledWith('resume', expect.any(Function))
+    expect(native.drainPendingActions).toHaveBeenCalledTimes(1)
+
+    const resumeHandler = CapacitorApp.addListener.mock.calls[0][1]
+    resumeHandler()
+
+    expect(native.drainPendingActions).toHaveBeenCalledTimes(2)
+  })
+
+  it('routes a FINISH_TAPPED action into SET_FINISH_REQUESTED, guarded by workoutId', async () => {
+    const routine = sampleRoutine()
+    const started = reducer(baseState({ routines: [routine], routineOrder: [routine.id] }), { type: 'START_WORKOUT', payload: { routineId: routine.id } })
+    const workoutId = started.activeWorkout.id
+
+    native.drainPendingActions.mockImplementationOnce(async (apply) => {
+      await Promise.resolve()
+      apply({ workoutId: 'some-other-workout-id', type: 'FINISH_TAPPED', payload: 0 })
+      apply({ workoutId, type: 'FINISH_TAPPED', payload: 0 })
+    })
+
+    let harness
+    await act(async () => {
+      harness = renderNotifications(started)
+    })
+
+    expect(harness.getState().activeWorkout.finishRequested).toBe(true)
+  })
+
+  it('applies two same-workout drained actions in order, not just the last one', async () => {
+    const routine = sampleRoutine()
+    let started = reducer(baseState({ routines: [routine], routineOrder: [routine.id] }), { type: 'START_WORKOUT', payload: { routineId: routine.id } })
+    const restUntil = new Date(Date.now() + 60_000).toISOString()
+    started = { ...started, activeWorkout: { ...started.activeWorkout, restUntil, restTotalSec: 90 } }
+    const workoutId = started.activeWorkout.id
+
+    native.drainPendingActions.mockImplementationOnce(async (apply) => {
+      await Promise.resolve()
+      apply({ workoutId, type: 'REST_ADJUST', payload: 15 })
+      apply({ workoutId, type: 'REST_ADJUST', payload: 15 })
+    })
+
+    let harness
+    await act(async () => {
+      harness = renderNotifications(started)
+    })
+
+    // 90 + 15 + 15 — proves both were applied, in sequence, not just one.
+    expect(harness.getState().activeWorkout.restTotalSec).toBe(120)
   })
 })

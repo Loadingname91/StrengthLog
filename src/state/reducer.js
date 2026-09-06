@@ -260,6 +260,14 @@ export function reducer(state, action) {
       if (!state.activeWorkout) return state
       return { ...state, activeWorkout: { ...state.activeWorkout, notifFallback: action.payload } }
 
+    // Set when the notification's "Finish" action is tapped (Phase 9,
+    // NOTIF-15); ActiveWorkout.jsx is the sole reader/clearer — it runs its
+    // own existing finish() logic rather than this effect finishing the
+    // workout directly.
+    case 'SET_FINISH_REQUESTED':
+      if (!state.activeWorkout) return state
+      return { ...state, activeWorkout: { ...state.activeWorkout, finishRequested: action.payload } }
+
     case 'FINISH_WORKOUT': {
       const aw = state.activeWorkout
       if (!aw) return state

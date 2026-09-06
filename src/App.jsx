@@ -54,6 +54,17 @@ function Shell() {
   const withNav = showNavFor(pathname)
   const sessionActive = withNav && !!state.activeWorkout
   useAndroidBackButton()
+
+  // Notification "Finish" tap (Phase 9, NOTIF-15) can arrive while the app
+  // is showing any screen — Shell is the one place guaranteed mounted
+  // regardless of route. This only navigates; ActiveWorkout.jsx remains the
+  // sole reader/clearer of the flag once it mounts.
+  useEffect(() => {
+    if (state.activeWorkout?.finishRequested && pathname !== '/workout') {
+      navigate('/workout')
+    }
+  }, [state.activeWorkout?.finishRequested, pathname, navigate])
+
   return (
     <div className="mx-auto min-h-screen max-w-[480px]" style={{ background: 'var(--bg)' }}>
       <div style={{ paddingBottom: sessionActive ? 140 : withNav ? 84 : 0 }}>

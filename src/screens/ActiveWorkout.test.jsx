@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { useSyncExternalStore } from 'react'
-import { render, fireEvent, screen } from '@testing-library/react'
+import { render, fireEvent, screen, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { reducer } from '../state/reducer'
 import ActiveWorkout from './ActiveWorkout'
@@ -304,5 +304,31 @@ describe('Notification fallback banner (Phase 8, NOTIF-13)', () => {
   it('does not render the banner when notifFallback is absent', () => {
     renderWorkout(twoSetWorkout())
     expect(screen.queryByText(/Notifications are blocked/)).not.toBeInTheDocument()
+  })
+})
+
+describe('Notification "Finish" tap (Phase 9, NOTIF-15)', () => {
+  it('opens the existing confirm sheet when sets are incomplete', () => {
+    renderWorkout(twoSetWorkout())
+
+    act(() => {
+      testStore.dispatch({ type: 'SET_FINISH_REQUESTED', payload: true })
+    })
+
+    expect(screen.getByText('Finish with sets left?')).toBeInTheDocument()
+    expect(testStore.getState().activeWorkout.finishRequested).toBe(false)
+  })
+
+  it('finishes directly, with no confirm sheet, when every set is already done', () => {
+    const workout = twoSetWorkout()
+    workout.exercises[0].sets = workout.exercises[0].sets.map((s) => ({ ...s, weight: '60', reps: '10', done: true }))
+    renderWorkout(workout)
+
+    act(() => {
+      testStore.dispatch({ type: 'SET_FINISH_REQUESTED', payload: true })
+    })
+
+    expect(screen.queryByText('Finish with sets left?')).not.toBeInTheDocument()
+    expect(testStore.getState().activeWorkout).toBeNull()
   })
 })
