@@ -1,4 +1,6 @@
 apply plugin: 'com.android.application'
+// Phase 8 (v1.2): notification service/plugin sources are Kotlin.
+apply plugin: 'kotlin-android'
 
 android {
     namespace = "com.fitlog.app"
@@ -22,6 +24,11 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    // Must match capacitor.build.gradle's compileOptions (Java 21) — Gradle
+    // errors on mismatched Java/Kotlin JVM targets in the same module.
+    kotlinOptions {
+        jvmTarget = "21"
+    }
 }
 
 repositories {
@@ -32,6 +39,7 @@ repositories {
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
     // Explicit: NotificationChannelCompat/ServiceCompat/NotificationManagerCompat
     // (Phase 8's notification service) are used directly, not just pulled in
     // transitively through appcompat.
