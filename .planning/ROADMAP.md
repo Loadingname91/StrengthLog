@@ -212,7 +212,7 @@ Today's rest-timer alert (`beep()` + `navigator.vibrate` in `ActiveWorkout.jsx`)
 ## Phases
 
 - [x] **Phase 7: Notification Foundation** - The full JS effect layer (idempotent against keystrokes), settings + permission UX, and every trigger that needs zero native code — reminders, PR celebrations, and a provisional rest-done alert (completed 2026-09-06)
-- [ ] **Phase 8: Ongoing Workout Notification** - A custom Android foreground service: persistent Spotify-style notification with a live chronometer, wake-lock-accurate rest alerts, and working Skip/+15s actions
+- [ ] **Phase 8: Ongoing Workout Notification** - A custom Android foreground service: persistent Spotify-style notification with a live chronometer, wake-lock-accurate rest alerts, and working Skip/+15s actions (implemented 2026-09-06, pending on-device verification before it counts as done)
 - [ ] **Phase 9: Notification Polish** - Durable action replay across process death, a native "Finish" deep-link into the existing confirm flow, audio ducking so the rest ding cuts through music, and battery-optimization guidance
 
 ## Phase Details
@@ -252,7 +252,11 @@ Today's rest-timer alert (`beep()` + `navigator.vibrate` in `ActiveWorkout.jsx`)
   4. Finishing, discarding, or deleting all data removes the notification and stops the service within about a second, with no leaked service or notification left behind afterward.
   5. If notification permission is denied, the service never starts silently with nothing visible — the app falls back to the existing in-app beep and shows a banner explaining why.
 
-**Plans**: Not yet started — see `08-CONTEXT.md` for the native architecture (foreground service type, manifest changes, file list, verification script) worked out ahead of implementation.
+**Plans**: 2/2 plans complete (implemented inline, no subagent dispatch — see `08-01-SUMMARY.md`/`08-02-SUMMARY.md`); on-device verification (the steps that decide whether this phase's success criteria are actually met) not yet run — no Android SDK in this environment.
+Plans:
+
+- [x] 08-01-PLAN.md — Native foreground service in isolation: WorkoutService, PendingActionStore, NotificationChannels, manifest + gradle (NOTIF-09, NOTIF-10)
+- [x] 08-02-PLAN.md — Capacitor plugin bridge + JS wiring: pending-action drain, permission-denied fallback banner (NOTIF-11, NOTIF-12, NOTIF-13)
 
 **UI hint**: no new screens — the "UI" is the Android notification itself, specified in `08-CONTEXT.md`
 
@@ -278,7 +282,7 @@ Today's rest-timer alert (`beep()` + `navigator.vibrate` in `ActiveWorkout.jsx`)
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 7. Notification Foundation | Implemented directly | Complete | 2026-09-06 |
-| 8. Ongoing Workout Notification | 0 | Not started | — |
+| 8. Ongoing Workout Notification | 2/2 | Implemented, pending device verification | 2026-09-06 |
 | 9. Notification Polish | 0 | Not started | — |
 
-**Phase 7 of v1.2 shipped 2026-09-06** — 8 of 17 requirements complete (NOTIF-01..08). Phases 8-9 (NOTIF-09..17) require a real Android build environment this session doesn't have and are picked up separately.
+**Phase 7 of v1.2 shipped 2026-09-06** — 8 of 17 requirements complete (NOTIF-01..08). **Phase 8 implemented 2026-09-06** — NOTIF-09..13 built and self-reviewed (native foreground service + plugin bridge + JS wiring), 123/123 tests passing, but not yet counted complete: this environment has no Android SDK, so the on-device steps that decide whether the phase actually works (foreground notification, wake-lock-exact rest alert, Skip/+15s surviving a killed process, clean teardown, permission-denied fallback) are the user's next step on a real device. Phase 9 (NOTIF-14..17) is planned and documented but not started, and depends on Phase 8's device verification landing first.

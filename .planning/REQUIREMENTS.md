@@ -85,13 +85,13 @@ GitHub Pages/web build. Each maps to a v1.2 roadmap phase.
 - [x] **NOTIF-07**: The notification effect layer depends only on primitives derived from the active workout, never the workout object itself, so a `SET_SET_FIELD` keystroke never reaches the native bridge (proven by a dedicated test: ten keystrokes → zero bridge calls)
 - [x] **NOTIF-08**: No scheduled notification triggers Android's exact-alarm permission screen (`isExactNotification: false` on every scheduled call)
 
-### Ongoing Workout Notification (Phase 8 — not started, requires a native build environment)
+### Ongoing Workout Notification (Phase 8 — implemented 2026-09-06, pending on-device verification)
 
-- [ ] **NOTIF-09**: A persistent notification is visible for the whole workout session, showing the routine/exercise name with a live, self-ticking system chronometer (counting up normally, counting down during rest) that needs no per-second traffic from the app
-- [ ] **NOTIF-10**: The rest-timer alert (sound + vibration) fires within about a second of its deadline even with the screen locked and the app fully backgrounded, via a foreground service holding a wake lock — not a scheduled OS alarm
-- [ ] **NOTIF-11**: The ongoing notification exposes working "Skip rest" and "+15s" actions that apply correctly even when the app isn't in the foreground
-- [ ] **NOTIF-12**: Finishing, discarding, or deleting all data removes the notification and stops the service within about a second, with no leaked service or notification afterward
-- [ ] **NOTIF-13**: If notification permission is denied, the app never silently starts a service with nothing visible — it falls back to the existing in-app beep and shows an explanatory banner
+- [ ] **NOTIF-09**: A persistent notification is visible for the whole workout session, showing the routine/exercise name with a live, self-ticking system chronometer (counting up normally, counting down during rest) that needs no per-second traffic from the app — *implemented in `WorkoutService.kt`, unverified: no Android SDK in this environment*
+- [ ] **NOTIF-10**: The rest-timer alert (sound + vibration) fires within about a second of its deadline even with the screen locked and the app fully backgrounded, via a foreground service holding a wake lock — not a scheduled OS alarm — *implemented (`PARTIAL_WAKE_LOCK` + `Handler.postDelayed`), unverified on-device*
+- [ ] **NOTIF-11**: The ongoing notification exposes working "Skip rest" and "+15s" actions that apply correctly even when the app isn't in the foreground — *implemented (service-side handling + `PendingActionStore` drain into the existing `REST_ADJUST`/`REST_SKIP` actions), unverified on-device*
+- [ ] **NOTIF-12**: Finishing, discarding, or deleting all data removes the notification and stops the service within about a second, with no leaked service or notification afterward — *implemented (`ACTION_STOP` teardown path), unverified on-device*
+- [ ] **NOTIF-13**: If notification permission is denied, the app never silently starts a service with nothing visible — it falls back to the existing in-app beep and shows an explanatory banner — *implemented (`serviceActive` guard + `SET_NOTIF_FALLBACK` banner), verified via test at the JS layer; the actual system permission-denial path is unverified on-device*
 
 ### Notification Polish (Phase 9 — not started)
 
@@ -158,11 +158,11 @@ Deferred to a future release. Tracked but not in this milestone's roadmap.
 | NOTIF-06 | Phase 7 | Complete |
 | NOTIF-07 | Phase 7 | Complete |
 | NOTIF-08 | Phase 7 | Complete |
-| NOTIF-09 | Phase 8 | Not started |
-| NOTIF-10 | Phase 8 | Not started |
-| NOTIF-11 | Phase 8 | Not started |
-| NOTIF-12 | Phase 8 | Not started |
-| NOTIF-13 | Phase 8 | Not started |
+| NOTIF-09 | Phase 8 | Implemented, pending device verification |
+| NOTIF-10 | Phase 8 | Implemented, pending device verification |
+| NOTIF-11 | Phase 8 | Implemented, pending device verification |
+| NOTIF-12 | Phase 8 | Implemented, pending device verification |
+| NOTIF-13 | Phase 8 | Implemented, pending device verification |
 | NOTIF-14 | Phase 9 | Not started |
 | NOTIF-15 | Phase 9 | Not started |
 | NOTIF-16 | Phase 9 | Not started |
@@ -172,10 +172,10 @@ Deferred to a future release. Tracked but not in this milestone's roadmap.
 
 - v1 requirements: 16 total, all complete
 - v1.1 requirements: 11 total, all complete
-- v1.2 requirements: 17 total, 8 complete (Phase 7), 9 not started (Phases 8-9 — require a native Android build environment this session doesn't have)
+- v1.2 requirements: 17 total, 8 complete (Phase 7), 5 implemented pending device verification (Phase 8), 4 not started (Phase 9 — depends on Phase 8's device verification)
 - Mapped to phases: 44
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-05*
-*Last updated: 2026-09-06 — v1.2 "Reliable Alerts" opened: Phase 7 (Notification Foundation) shipped, all 8 requirements (NOTIF-01..08) complete. Phases 8-9 (NOTIF-09..17, the native foreground service and its polish) are planned and documented but not started.*
+*Last updated: 2026-09-06 — v1.2 "Reliable Alerts": Phase 7 (Notification Foundation) shipped, all 8 requirements (NOTIF-01..08) complete. Phase 8 (Ongoing Workout Notification, NOTIF-09..13) planned and implemented inline in one session — native foreground service, Capacitor plugin bridge, and JS wiring all written and self-reviewed, 123/123 tests passing — but not counted complete until verified on a real device (no Android SDK in this environment). Phase 9 (NOTIF-14..17) planned and documented but not started.*
