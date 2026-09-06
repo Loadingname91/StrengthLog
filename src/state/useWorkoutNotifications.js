@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { unitName } from '../lib/exercises'
+import { exerciseById, unitName } from '../lib/exercises'
 import { buildReminderPlan } from '../lib/reminderPlan'
 import * as native from '../lib/nativeNotifications'
 
@@ -34,26 +34,48 @@ export function useWorkoutNotifications(state, exercises) {
   const lastPRSetIndex = aw?.lastPR?.setIndex ?? null
   const prKey = aw?.lastPR ? `${awId}:${lastPRExerciseIndex}:${lastPRSetIndex}` : null
 
+  const lastPRUnit = aw && lastPRExerciseIndex != null ? aw.exercises[lastPRExerciseIndex] : null
+  const lastPRSet = lastPRUnit && lastPRSetIndex != null ? lastPRUnit.sets[lastPRSetIndex] : null
+  const lastPRExId = lastPRUnit
+    ? (lastPRUnit.blockType === 'superset' ? lastPRUnit.exerciseIds[lastPRSet?.exerciseIndex] : lastPRUnit.exerciseId)
+    : null
+  const lastPRName = lastPRExId ? exerciseById(lastPRExId, exercises)?.name ?? null : null
+
+  const { notifyRestDone, notifyPR: notifyPREnabled, notifyReminders, reminderTime } = state.settings
+
   // Seeded from the current value, not null: lastPR is never cleared for the
   // life of a workout (it just carries forward on every TOGGLE_SET_DONE), so
   // without this a cold reload mid-workout would re-celebrate whatever PR
   // was already sitting in persisted state.
   const firedPrKeyRef = useRef(prKey)
 
+  // Created once per app run; createChannel is idempotent (a no-op if the
+  // channel already exists), so this is safe to call on every native launch.
+  useEffect(() => {
+    native.ensureChannels()
+  }, [])
+
   // A — lifecycle. FINISH_WORKOUT, DISCARD_WORKOUT and DELETE_ALL_DATA all
   // set activeWorkout to null wholesale, so that one transition is the only
   // "cancel everything" seam this needs. A non-null id on mount (a workout
-  // persisted across a cold app restart) starts it too.
+  // persisted across a cold app restart) starts it too. Requesting the
+  // permission here (rather than a specific "Start Workout" button) covers
+  // every entry point that begins a workout — Home's card and
+  // WorkoutOverview's — with one line instead of two.
   useEffect(() => {
-    if (awId) native.startWorkout({ workoutId: awId })
-    else native.stopWorkout()
+    if (awId) {
+      native.startWorkout({ workoutId: awId })
+      native.requestNotificationPermission()
+    } else {
+      native.stopWorkout()
+    }
   }, [awId])
 
   // B — content.
   useEffect(() => {
     if (!awId) return
-    native.updateWorkout({ workoutId: awId, restUntil, restTotalSec: restTotal, setsDone, setsTotal, exerciseName })
-  }, [awId, restUntil, restTotal, setsDone, setsTotal, exerciseName])
+    native.updateWorkout({ workoutId: awId, restUntil, restTotalSec: restTotal, setsDone, setsTotal, exerciseName, notifyRestDone })
+  }, [awId, restUntil, restTotal, setsDone, setsTotal, exerciseName, notifyRestDone])
 
   // C — PR celebration. Keyed on workout id + set coordinates together: keying
   // on coordinates alone would either miss a genuinely new PR that happens to
@@ -62,15 +84,14 @@ export function useWorkoutNotifications(state, exercises) {
   useEffect(() => {
     if (!prKey || firedPrKeyRef.current === prKey) return
     firedPrKeyRef.current = prKey
-    native.notifyPR({ workoutId: awId, exerciseIndex: lastPRExerciseIndex, setIndex: lastPRSetIndex })
-  }, [prKey, awId, lastPRExerciseIndex, lastPRSetIndex])
+    native.notifyPR({ workoutId: awId, exerciseIndex: lastPRExerciseIndex, setIndex: lastPRSetIndex, exerciseName: lastPRName, notifyPR: notifyPREnabled })
+  }, [prKey, awId, lastPRExerciseIndex, lastPRSetIndex, lastPRName, notifyPREnabled])
 
   // D — reminders. None of these fields change during an active workout
   // (SET_SET_FIELD/TOGGLE_SET_DONE/REST_* only ever touch activeWorkout), so
   // this stays quiet while a workout is being logged and only recomputes on
   // an actual schedule-relevant change: a session finishing, a schedule
   // edit, or the reminder setting itself changing.
-  const { notifyReminders, reminderTime } = state.settings
   const { routineOrder, sequenceIndex, routines, weekdayAssignments, sessions, scheduleRestartAt, createdAt } = state
   useEffect(() => {
     const plan = buildReminderPlan({

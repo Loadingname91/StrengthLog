@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import { useStore } from '../state/StoreContext'
@@ -7,6 +7,9 @@ import SegmentedControl from '../components/SegmentedControl'
 import ConfirmSheet from '../components/ConfirmSheet'
 import { ChevronRightIcon, TrashIcon } from '../components/Icons'
 import { goalProgress } from '../lib/selectors'
+import { checkNotificationPermission, requestNotificationPermission } from '../lib/nativeNotifications'
+
+const PERMISSION_LABEL = { granted: 'Allowed', denied: 'Blocked', prompt: 'Not asked yet', 'prompt-with-rationale': 'Not asked yet' }
 
 function Row({ label, children }) {
   return (
@@ -22,6 +25,15 @@ export default function Settings() {
   const navigate = useNavigate()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleteGoalTarget, setDeleteGoalTarget] = useState(null)
+  const [permission, setPermission] = useState(null)
+
+  useEffect(() => {
+    checkNotificationPermission().then(setPermission)
+  }, [])
+
+  async function requestPermission() {
+    setPermission(await requestNotificationPermission())
+  }
 
   function set(patch) {
     dispatch({ type: 'SET_SETTINGS', payload: patch })
@@ -61,6 +73,21 @@ export default function Settings() {
         <div className="px-5 pt-5">
           <div className="mb-2 text-[13px] font-semibold">Notifications</div>
           <Card>
+            <Row label="Notification access">
+              {permission === 'granted' ? (
+                <span className="text-sm font-semibold" style={{ color: 'var(--accent-dark)' }}>Allowed</span>
+              ) : (
+                <button onClick={requestPermission} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ background: 'var(--accent)' }}>
+                  {permission ? PERMISSION_LABEL[permission] || permission : 'Checking…'} — Request
+                </button>
+              )}
+            </Row>
+            {permission === 'denied' && (
+              <div className="pb-2.5 text-[11px]" style={{ color: 'var(--muted)' }}>
+                Already blocked — Android won't ask again here. Enable it from the system notification settings for FitLog instead.
+              </div>
+            )}
+            <div className="h-px" style={{ background: 'var(--border)' }} />
             <Row label="Rest-timer alerts">
               <input type="checkbox" checked={state.settings.notifyRestDone} onChange={(e) => set({ notifyRestDone: e.target.checked })} className="h-5 w-5" />
             </Row>

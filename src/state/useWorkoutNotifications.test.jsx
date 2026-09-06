@@ -4,6 +4,9 @@ import { useWorkoutNotifications } from './useWorkoutNotifications'
 import { reducer } from './reducer'
 
 vi.mock('../lib/nativeNotifications', () => ({
+  ensureChannels: vi.fn(),
+  requestNotificationPermission: vi.fn(),
+  checkNotificationPermission: vi.fn(),
   startWorkout: vi.fn(),
   updateWorkout: vi.fn(),
   stopWorkout: vi.fn(),
@@ -14,7 +17,7 @@ import * as native from '../lib/nativeNotifications'
 
 function baseState(overrides = {}) {
   return {
-    settings: { units: 'kg', theme: 'system', restDefault: 90, showRIR: true, notifyReminders: false, reminderTime: '18:00' },
+    settings: { units: 'kg', theme: 'system', restDefault: 90, showRIR: true, notifyRestDone: true, notifyOngoing: true, notifyPR: true, notifyReminders: false, reminderTime: '18:00' },
     user: { name: 'Athlete' },
     customExercises: [],
     exerciseNotes: {},

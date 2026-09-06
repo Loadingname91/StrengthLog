@@ -1,0 +1,15 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!--
+      Android renders a notification's small icon as a plain silhouette —
+      only this path's alpha channel matters, not its color — so a solid
+      white fill on transparent is all that's needed. A barbell: two end
+      caps, two plates, one connecting bar.
+    -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M2,10h2v4h-2z M4,8h2v8h-2z M18,8h2v8h-2z M20,10h2v4h-2z M6,11h12v2h-12z" />
+</vector>
