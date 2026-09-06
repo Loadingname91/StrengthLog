@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Reliable Alerts
-current_phase: 8
-current_phase_name: Ongoing Workout Notification
+current_phase: 9
+current_phase_name: Notification Polish
 status: implemented_pending_device_verification
-stopped_at: Phase 8 (both plans) implemented and self-reviewed — native Kotlin cannot be compiled or run in this session (no Android SDK); on-device verification is the next step, on the user's Windows machine
-last_updated: "2026-09-06T09:40:00.000Z"
+stopped_at: All three v1.2 phases (7, 8, 9) implemented — Phase 7 fully verified/shipped; Phases 8 and 9's native work is unverified pending the user's on-device pass, by their own explicit direction this session ("work on it, I'll do device verification later")
+last_updated: "2026-09-06T10:15:00.000Z"
 last_activity: 2026-09-06
-last_activity_desc: Phase 8 planned (08-01-PLAN.md, 08-02-PLAN.md) and executed inline in the same session, no subagent dispatch. 08-01 built the foreground service in isolation (WorkoutService, PendingActionStore, NotificationChannels, manifest/gradle) — adb-testable independent of any plugin. 08-02 built the Capacitor plugin bridge and wired nativeNotifications.js/useWorkoutNotifications.js/reducer.js/ActiveWorkout.jsx to it, including the pending-action drain for Skip/+15s across a killed process and the permission-denied fallback banner. A goal-backward self-review before writing code caught a real bug (WorkoutService referencing the not-yet-existing plugin class — fixed via an inverted actionListener extension point). 123/123 tests passing (up from 115), lint clean at the same baseline warning count, build and `npx cap sync android` both clean. Native code reviewed by hand against 08-CONTEXT.md's decisions and the actual Capacitor Android source in node_modules — not compiled; this environment has no Android SDK (confirmed: no java/adb on PATH).
+last_activity_desc: Phase 9 (Notification Polish) planned (09-01-PLAN.md, 09-02-PLAN.md) and executed inline, no subagent dispatch, immediately after Phase 8 in the same session — user explicitly asked to proceed without waiting for Phase 8's device verification. 09-01 (native): audio-focus-ducked rest-done alert (MediaPlayer + AudioManager + Vibrator, API-24-safe), the notification's Finish action now routes through the service's existing pending-action pipeline instead of opening the app directly, and PendingActionStore gained a 50-entry bound. 09-02 (JS): effect E now also drains on Capacitor's resume event (not just mount), a new SET_FINISH_REQUESTED flag routes a Finish tap into ActiveWorkout's own existing finish()/confirm-sheet logic (hoisted above its early-return guard as useCallback so the new effect could depend on it correctly), App.jsx's Shell navigates to /workout if the tap arrived elsewhere, and Settings gained a battery-optimization guidance line. All 17 v1.2 requirements (NOTIF-01..17) are now implemented. 130/130 tests passing (up from 115 at session start), lint at baseline plus one new, justified warning (documented), build and `npx cap sync android` clean throughout. No native code compiled anywhere this session — no Android SDK (confirmed: no java/adb on PATH).
 progress:
   total_phases: 9
   completed_phases: 7
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 14
+  completed_plans: 14
   percent: 78
 ---
 
@@ -24,24 +24,24 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-06)
 
 **Core value:** Logging a workout mid-session — weight, reps, RIR, rest — must be fast, reliable, and never lose data, even if the user backgrounds the app or navigates away mid-session.
-**Current focus:** v1.0 and v1.1 shipped in full. v1.2 "Reliable Alerts" opened 2026-09-06: Phase 7 (Notification Foundation) complete; Phase 8 (Ongoing Workout Notification — the native foreground service) is planned and implemented, pending on-device verification the user runs locally.
+**Current focus:** v1.0 and v1.1 shipped in full. v1.2 "Reliable Alerts" opened 2026-09-06: all three phases (7, 8, 9) are now implemented — Phase 7 verified/shipped; Phases 8 and 9's native/on-device behavior awaits the user's own verification pass, which they've explicitly deferred to later.
 
 ## Current Position
 
 Milestone: v1.2 — Reliable Alerts (in progress)
-Phase: 8 of 9 overall (2 of 3 in this milestone) — Ongoing Workout Notification, implemented pending device verification
-Plan: 08-01-PLAN.md (native foreground service) and 08-02-PLAN.md (plugin bridge + JS wiring), both executed inline in this session — no subagent dispatch (see 08-01-SUMMARY.md / 08-02-SUMMARY.md)
-Status: Both plans executed and self-reviewed; native code cannot be compiled or run in this session's environment (no Android SDK)
-Last activity: 2026-09-06 — WorkoutService (foreground service, wake-lock rest alarm, chronometer notification), PendingActionStore, NotificationChannels, WorkoutNotificationPlugin (Capacitor bridge), and the JS-side wiring (nativeNotifications.js real implementations, useWorkoutNotifications.js's pending-action drain, SET_NOTIF_FALLBACK, ActiveWorkout.jsx banner). NOTIF-09..13 implemented; on-device verification (the steps in 08-CONTEXT.md/08-02-PLAN.md that actually decide whether the phase is done) not yet run.
+Phase: 9 of 9 overall (3 of 3 in this milestone) — Notification Polish, implemented pending device verification
+Plan: 09-01-PLAN.md (native: ducked audio, Finish routing, bounded queue) and 09-02-PLAN.md (JS: resume drain, finishRequested flow, battery guidance), both executed inline — no subagent dispatch (see 09-01-SUMMARY.md / 09-02-SUMMARY.md)
+Status: All three v1.2 phases now implemented and self-reviewed. Phase 7 is fully verified (real-browser check). Phases 8 and 9's native code has never been compiled — no Android SDK in this session — and the user explicitly asked to proceed with implementation now and run device verification later.
+Last activity: 2026-09-06 — Phase 9: audio-focus-ducked rest alert, notification Finish action routed through the existing pending-action pipeline, PendingActionStore bounded to 50 entries (09-01, native); effect E drains on Capacitor resume (not just mount), SET_FINISH_REQUESTED routes a Finish tap into ActiveWorkout's own finish()/confirm-sheet logic, App.jsx navigates to /workout when needed, Settings gained battery-optimization guidance (09-02, JS). All 17 v1.2 requirements (NOTIF-01..17) implemented.
 
-Progress: [████████░░] 78% (7/9 phases fully verified-complete — v1.0 and v1.1 fully shipped, v1.2 Phase 7 complete; Phase 8 implemented but counted complete only once device-verified)
+Progress: [████████░░] 78% (7/9 phases fully verified-complete — v1.0 and v1.1 fully shipped, v1.2 Phase 7 complete; Phases 8-9 implemented but counted complete only once device-verified)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 12
-- Average duration: ~55 min (Phases 1-6); Phases 7-8 executed directly/inline, not individually timed
+- Total plans completed: 14
+- Average duration: ~55 min (Phases 1-6); Phases 7-9 executed directly/inline, not individually timed
 - Total execution time: ~8.3 hours through Phase 6 (estimated from per-plan durations)
 
 **By Phase:**
@@ -56,11 +56,12 @@ Progress: [████████░░] 78% (7/9 phases fully verified-comple
 | 06 | 2 | ~115 min | ~57 min |
 | 07 | 1 (direct) | - | - |
 | 08 | 2 | - | - |
+| 09 | 2 | - | - |
 
 **Recent Trend:**
 
-- Last activity: Phase 8 (Ongoing Workout Notification) — planned and executed inline in one session (per explicit user direction: no GSD subagent spawning), through the full discuss→plan→execute flow rather than skipping straight to code as Phase 7 did.
-- Trend: Stable — a goal-backward self-review of the plan before writing any code caught a real architectural bug (a forward dependency from 08-01 to 08-02's not-yet-existing class) and the test-writing pass caught a real async-mocking bug (missing Promise resolution breaking every existing lifecycle test) — both fixed before/during execution, not discovered by the user later. Phase 8 remains the first phase in this project that this environment cannot verify end-to-end: native Android compilation and on-device behavior are the user's next step.
+- Last activity: Phase 9 (Notification Polish) — planned and executed inline immediately after Phase 8 in the same session, per the user's explicit instruction to keep going rather than wait for device verification.
+- Trend: Stable, with real bugs still being caught by self-review/testing before they'd have reached the user: Phase 9 alone caught a real API-level crash risk (`VibrationEffect.createWaveform` hoisted above its version guard — an actual method call, not a type reference, would have crashed on API 24-25 unconditionally) and a genuine pre-existing inefficiency incidentally surfaced by a lint-driven restructuring (`useState(Date.now())` calling `Date.now()` every render). v1.2's implementation work is now fully done; on-device verification for Phases 8-9 is the only thing standing between "implemented" and "shipped."
 
 *Updated after each plan completion*
 
@@ -89,15 +90,17 @@ Recent decisions affecting current work:
 - v1.2 Phase 8: `WorkoutService` exposes a settable `actionListener` callback instead of referencing `WorkoutNotificationPlugin` directly — 08-CONTEXT.md's original sketch had the service reach into the plugin, which doesn't exist until the next plan; inverted so 08-01 compiles and is adb-testable standalone
 - v1.2 Phase 8: `restUntil` crosses the JS↔native bridge as epoch milliseconds (converted in `nativeNotifications.js`), not the reducer's ISO string — keeps date parsing entirely on the JS side, avoiding `java.time`/desugoring on a minSdk-24 target
 - v1.2 Phase 8: a `serviceActive` flag in `nativeNotifications.js` guards `updateWorkout`/`stopWorkout` from ever (re)starting the foreground service as a side effect of `Context.startService()` on a service deliberately never started (permission denied, or the user turned the setting off) — the concrete mechanism behind NOTIF-13's guarantee
+- v1.2 Phase 9: `FINISH_TAPPED` never dispatches `FINISH_WORKOUT` from the effect layer — it sets `SET_FINISH_REQUESTED`, and `ActiveWorkout.jsx`'s own `finish()` (hoisted above its early-return guard, as `useCallback`) decides confirm-sheet-vs-direct-finish, since only that screen knows `allSetsLogged`
+- v1.2 Phase 9: effect E drains on Capacitor's `resume` event in addition to mount — closes the gap where the app is merely backgrounded with a frozen (not killed) WebView, which a mount-only drain (Phase 8) would miss
+- v1.2 Phase 9: user explicitly directed proceeding straight from Phase 8 into Phase 9 without waiting for device verification ("work on it, I'll do device verification later") — both phases' native/on-device behavior is implemented but unverified as a result
 
 ### Pending Todos
 
-- v1.2 Phase 8: **on-device verification** — this is the actual remaining work, not new code. `08-02-PLAN.md`'s `<verification>` section and `08-CONTEXT.md`'s numbered on-device steps cover: foreground notification + chronometer appearing, the rest alert firing on time with the phone locked (including after `adb shell dumpsys deviceidle force-idle`), Skip/+15s working while backgrounded/killed, clean teardown on finish/discard/delete-all with no leaked service, and the permission-denied fallback banner. Needs a real Android SDK + device — not possible in this session's environment (confirmed: no `java`/`adb` on `PATH`).
-- v1.2 Phase 9 (Notification Polish): pending-action durability across process death, native "Finish" deep-link, audio ducking, battery-optimization guidance — per `09-CONTEXT.md`, after Phase 8's device verification confirms 08-01/08-02 actually work.
+- v1.2 Phases 8 & 9: **on-device verification** — this is the actual remaining work for the whole milestone, not new code. All 17 requirements (NOTIF-01..17) are implemented; `08-02-PLAN.md`/`09-02-PLAN.md`'s `<verification>` sections and `08-CONTEXT.md`'s numbered steps cover: foreground notification + chronometer, the rest alert firing on time locked (including after `adb shell dumpsys deviceidle force-idle`) with real audio ducking, Skip/+15s and Finish working while backgrounded/killed (including the resume-drain path specifically), clean teardown, the permission-denied fallback banner, and battery-guidance visibility. Needs a real Android SDK + device — not possible in this session's environment (confirmed: no `java`/`adb` on `PATH`). The user has explicitly deferred this to their own time.
 
 ### Blockers/Concerns
 
-**Active blocker:** Phase 8's own success criteria cannot be verified in this environment — no Android SDK, so the native Kotlin cannot be compiled or run here. Both plans (08-01, 08-02) were implemented and self-reviewed by hand against 08-CONTEXT.md's decisions and the actual Capacitor Android source (`node_modules/@capacitor/android`), and everything on the JS side is verified (123/123 tests, lint, build, `cap sync` all clean). What's NOT verified: whether the manifest/foreground-service-type pairing actually avoids the `SecurityException` risk 08-CONTEXT.md flags, whether the wake-lock timer is actually accurate under real Doze/idle conditions, and whether the full Skip/+15s round-trip actually survives a real killed process. This is not a "stuck" blocker — it's the same legitimate environment boundary Phase 7 flagged before Phase 8 began, now reached at the point where it actually matters (native code exists to verify).
+**Active blocker (deferred, not stuck):** Phases 8 and 9's own success criteria cannot be verified in this environment — no Android SDK, so none of the native Kotlin across either phase has ever been compiled or run. Every plan was implemented and self-reviewed by hand against its CONTEXT.md's decisions and the actual Capacitor Android source (`node_modules/@capacitor/android`), and everything on the JS side is verified (130/130 tests, lint, build, `cap sync` all clean throughout). What's NOT verified: the manifest/foreground-service-type pairing's `SecurityException` risk, wake-lock timer accuracy under real Doze/idle conditions, whether Skip/+15s/Finish actually survive a real killed process, whether the resume-drain path fires correctly on a frozen (not killed) WebView, and whether the ducked audio actually ducks real music. This is the same legitimate environment boundary Phase 7 flagged before Phase 8 began — the user has explicitly chosen to have all the implementation work done now and verify on their own device later, rather than stopping after each phase to wait.
 
 Carried-forward notes from v1.0/v1.1:
 
@@ -116,6 +119,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-06T09:40:00.000Z
-Stopped at: v1.2 Phase 8 (Ongoing Workout Notification) — both plans implemented and self-reviewed; on-device verification is the next step, on a machine with a real Android SDK and device
-Resume file: .planning/phases/08-ongoing-notification/08-01-SUMMARY.md and 08-02-SUMMARY.md (what shipped and why); 08-02-PLAN.md's `<verification>` section and 08-CONTEXT.md's numbered on-device steps (what to actually run on a device to close out the phase); .planning/phases/09-notification-polish/09-CONTEXT.md (designed, not started — picks up after Phase 8's device verification)
+Last session: 2026-09-06T10:15:00.000Z
+Stopped at: v1.2 milestone — all three phases (7, 8, 9) implemented; Phase 7 verified/shipped, Phases 8-9 implemented and self-reviewed but not yet run on a device, per the user's explicit choice to defer verification
+Resume file: `.planning/phases/08-ongoing-notification/08-01-SUMMARY.md`/`08-02-SUMMARY.md` and `.planning/phases/09-notification-polish/09-01-SUMMARY.md`/`09-02-SUMMARY.md` (what shipped and why, across both phases); `08-02-PLAN.md`/`09-02-PLAN.md`'s `<verification>` sections and `08-CONTEXT.md`'s numbered on-device steps (the actual checklist to run on a device to close out both phases — Phase 9's additions layer on top of Phase 8's). Once device-verified, the milestone is ready for `/gsd-complete-milestone`.

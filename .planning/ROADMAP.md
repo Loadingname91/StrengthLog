@@ -213,7 +213,7 @@ Today's rest-timer alert (`beep()` + `navigator.vibrate` in `ActiveWorkout.jsx`)
 
 - [x] **Phase 7: Notification Foundation** - The full JS effect layer (idempotent against keystrokes), settings + permission UX, and every trigger that needs zero native code — reminders, PR celebrations, and a provisional rest-done alert (completed 2026-09-06)
 - [ ] **Phase 8: Ongoing Workout Notification** - A custom Android foreground service: persistent Spotify-style notification with a live chronometer, wake-lock-accurate rest alerts, and working Skip/+15s actions (implemented 2026-09-06, pending on-device verification before it counts as done)
-- [ ] **Phase 9: Notification Polish** - Durable action replay across process death, a native "Finish" deep-link into the existing confirm flow, audio ducking so the rest ding cuts through music, and battery-optimization guidance
+- [ ] **Phase 9: Notification Polish** - Durable action replay across process death, a native "Finish" deep-link into the existing confirm flow, audio ducking so the rest ding cuts through music, and battery-optimization guidance (implemented 2026-09-06, pending on-device verification before it counts as done)
 
 ## Phase Details
 
@@ -273,7 +273,11 @@ Plans:
   3. The rest-done sound ducks any active music playback (e.g. Spotify) instead of talking over it, and playback resumes automatically afterward.
   4. Settings (or an in-app prompt) tells a user on an aggressive OEM battery manager (Xiaomi/Samsung/OnePlus-class) how to allowlist the app, rather than the ongoing notification silently dying with no explanation.
 
-**Plans**: Not yet started — see `09-CONTEXT.md`.
+**Plans**: 2/2 plans complete (implemented inline, no subagent dispatch — see `09-01-SUMMARY.md`/`09-02-SUMMARY.md`); on-device verification not yet run.
+Plans:
+
+- [x] 09-01-PLAN.md — Native: audio-focus-ducked rest alert, notification Finish action routed through the pending-action pipeline, bounded queue (NOTIF-16, native half of NOTIF-15, NOTIF-14 hardening)
+- [x] 09-02-PLAN.md — JS: resume-triggered drain, finishRequested flow into the existing confirm sheet, battery guidance (NOTIF-14, NOTIF-15, NOTIF-17)
 
 **UI hint**: minor — one guidance banner/row, no new screens
 
@@ -283,6 +287,6 @@ Plans:
 |-------|----------------|--------|-----------|
 | 7. Notification Foundation | Implemented directly | Complete | 2026-09-06 |
 | 8. Ongoing Workout Notification | 2/2 | Implemented, pending device verification | 2026-09-06 |
-| 9. Notification Polish | 0 | Not started | — |
+| 9. Notification Polish | 2/2 | Implemented, pending device verification | 2026-09-06 |
 
-**Phase 7 of v1.2 shipped 2026-09-06** — 8 of 17 requirements complete (NOTIF-01..08). **Phase 8 implemented 2026-09-06** — NOTIF-09..13 built and self-reviewed (native foreground service + plugin bridge + JS wiring), 123/123 tests passing, but not yet counted complete: this environment has no Android SDK, so the on-device steps that decide whether the phase actually works (foreground notification, wake-lock-exact rest alert, Skip/+15s surviving a killed process, clean teardown, permission-denied fallback) are the user's next step on a real device. Phase 9 (NOTIF-14..17) is planned and documented but not started, and depends on Phase 8's device verification landing first.
+**Phase 7 of v1.2 shipped 2026-09-06** — 8 of 17 requirements complete (NOTIF-01..08). **Phases 8 and 9 both implemented 2026-09-06** — all of NOTIF-09..17 built and self-reviewed (native foreground service, plugin bridge, JS wiring, audio ducking, Finish deep-link, resume drain, battery guidance), 130/130 tests passing, but not yet counted complete: this environment has no Android SDK, so the on-device steps that decide whether either phase actually works are the user's next step on a real device — explicitly deferred by the user's own choice ("work on it, I'll do device verification later") rather than blocked. All 17 v1.2 requirements are implemented; the milestone is otherwise ready for `/gsd-complete-milestone` once device-verified.

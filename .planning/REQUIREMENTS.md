@@ -93,12 +93,12 @@ GitHub Pages/web build. Each maps to a v1.2 roadmap phase.
 - [ ] **NOTIF-12**: Finishing, discarding, or deleting all data removes the notification and stops the service within about a second, with no leaked service or notification afterward — *implemented (`ACTION_STOP` teardown path), unverified on-device*
 - [ ] **NOTIF-13**: If notification permission is denied, the app never silently starts a service with nothing visible — it falls back to the existing in-app beep and shows an explanatory banner — *implemented (`serviceActive` guard + `SET_NOTIF_FALLBACK` banner), verified via test at the JS layer; the actual system permission-denial path is unverified on-device*
 
-### Notification Polish (Phase 9 — not started)
+### Notification Polish (Phase 9 — implemented 2026-09-06, pending on-device verification)
 
-- [ ] **NOTIF-14**: An action tapped on the notification while the app is fully backgrounded or killed is durably queued and correctly replayed into the reducer on resume, without duplication or reordering
-- [ ] **NOTIF-15**: Tapping "Finish" on the notification opens the app into the existing finish-confirmation flow rather than finishing the workout from native code
-- [ ] **NOTIF-16**: The rest-done sound ducks any active music playback instead of talking over it, resuming playback afterward
-- [ ] **NOTIF-17**: Users on aggressive OEM battery managers see in-app guidance on allowlisting the app so the ongoing notification survives
+- [ ] **NOTIF-14**: An action tapped on the notification while the app is fully backgrounded or killed is durably queued and correctly replayed into the reducer on resume, without duplication or reordering — *implemented (bounded `PendingActionStore` + drain on both mount and Capacitor's `resume` event, ordering proven by test), unverified on-device*
+- [ ] **NOTIF-15**: Tapping "Finish" on the notification opens the app into the existing finish-confirmation flow rather than finishing the workout from native code — *implemented (`ACTION_FINISH_TAPPED` → `SET_FINISH_REQUESTED` → `ActiveWorkout.jsx`'s own `finish()`), unverified on-device*
+- [ ] **NOTIF-16**: The rest-done sound ducks any active music playback instead of talking over it, resuming playback afterward — *implemented (`AudioManager.requestAudioFocus(AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)` + `MediaPlayer`, API-24-safe), unverified on-device*
+- [ ] **NOTIF-17**: Users on aggressive OEM battery managers see in-app guidance on allowlisting the app so the ongoing notification survives — *implemented (Settings guidance line, no native permission call), verifiable now — it's a plain UI string, though not yet visually confirmed on-device*
 
 ## v2 Requirements
 
@@ -163,19 +163,19 @@ Deferred to a future release. Tracked but not in this milestone's roadmap.
 | NOTIF-11 | Phase 8 | Implemented, pending device verification |
 | NOTIF-12 | Phase 8 | Implemented, pending device verification |
 | NOTIF-13 | Phase 8 | Implemented, pending device verification |
-| NOTIF-14 | Phase 9 | Not started |
-| NOTIF-15 | Phase 9 | Not started |
-| NOTIF-16 | Phase 9 | Not started |
-| NOTIF-17 | Phase 9 | Not started |
+| NOTIF-14 | Phase 9 | Implemented, pending device verification |
+| NOTIF-15 | Phase 9 | Implemented, pending device verification |
+| NOTIF-16 | Phase 9 | Implemented, pending device verification |
+| NOTIF-17 | Phase 9 | Implemented, pending device verification |
 
 **Coverage:**
 
 - v1 requirements: 16 total, all complete
 - v1.1 requirements: 11 total, all complete
-- v1.2 requirements: 17 total, 8 complete (Phase 7), 5 implemented pending device verification (Phase 8), 4 not started (Phase 9 — depends on Phase 8's device verification)
+- v1.2 requirements: 17 total, 8 complete (Phase 7), 9 implemented pending device verification (Phases 8-9)
 - Mapped to phases: 44
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-05*
-*Last updated: 2026-09-06 — v1.2 "Reliable Alerts": Phase 7 (Notification Foundation) shipped, all 8 requirements (NOTIF-01..08) complete. Phase 8 (Ongoing Workout Notification, NOTIF-09..13) planned and implemented inline in one session — native foreground service, Capacitor plugin bridge, and JS wiring all written and self-reviewed, 123/123 tests passing — but not counted complete until verified on a real device (no Android SDK in this environment). Phase 9 (NOTIF-14..17) planned and documented but not started.*
+*Last updated: 2026-09-06 — v1.2 "Reliable Alerts": Phase 7 (Notification Foundation) shipped, all 8 requirements (NOTIF-01..08) complete. Phases 8 (Ongoing Workout Notification, NOTIF-09..13) and 9 (Notification Polish, NOTIF-14..17) both planned and implemented inline in this session — native foreground service, Capacitor plugin bridge, audio ducking, Finish deep-link, resume-triggered drain, and battery guidance all written and self-reviewed, 130/130 tests passing — but not counted complete until verified on a real device (no Android SDK in this environment; the user has explicitly deferred that verification to their own time). All 17 v1.2 requirements are implemented.*
