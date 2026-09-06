@@ -67,6 +67,39 @@ Each maps to a v1.1 roadmap phase.
 - [x] **SUPER-02**: Active Workout auto-advances to the next exercise in a superset round immediately after a set is marked done — no manual tab-switching required to follow the intended alternating flow
 - [x] **SUPER-03**: Active Workout renders a merged superset as one interleaved flow (both exercises' current position visible together) rather than two independent per-exercise tabs
 
+## v1.2 Requirements
+
+Requirements for the "Reliable Alerts" milestone — an Android-native ongoing
+workout notification and alerts that fire correctly regardless of which
+screen is open or whether the phone is locked. None of this reaches the
+GitHub Pages/web build. Each maps to a v1.2 roadmap phase.
+
+### Notification Foundation (Phase 7 — complete, zero native code)
+
+- [x] **NOTIF-01**: Settings shows a "Notifications" card (native builds only) with toggles for rest alerts, the ongoing notification, PR celebrations, and reminders, plus a reminder-time picker and a live permission-status row with a re-request action
+- [x] **NOTIF-02**: New settings keys are backfilled to their defaults for existing users generically (defaults merged under persisted values), not via a one-off line per key
+- [x] **NOTIF-03**: Notification permission is requested the moment a workout actually starts — from the one lifecycle seam every "start a workout" path funnels through — not at cold app launch
+- [x] **NOTIF-04**: A rest-done notification fires via a scheduled local notification even when Active Workout isn't the foreground screen (provisional accuracy; Phase 8 replaces this with a wake-lock-exact version)
+- [x] **NOTIF-05**: Workout reminders are computed from the same "next up" schedule Home already surfaces (`dueInfo`/`weekdayName`), not a separate schedule, and reschedule automatically when a session finishes or the schedule changes
+- [x] **NOTIF-06**: A new PR posts a standalone notification only when the app is backgrounded — the existing in-app badge already covers the foreground case
+- [x] **NOTIF-07**: The notification effect layer depends only on primitives derived from the active workout, never the workout object itself, so a `SET_SET_FIELD` keystroke never reaches the native bridge (proven by a dedicated test: ten keystrokes → zero bridge calls)
+- [x] **NOTIF-08**: No scheduled notification triggers Android's exact-alarm permission screen (`isExactNotification: false` on every scheduled call)
+
+### Ongoing Workout Notification (Phase 8 — not started, requires a native build environment)
+
+- [ ] **NOTIF-09**: A persistent notification is visible for the whole workout session, showing the routine/exercise name with a live, self-ticking system chronometer (counting up normally, counting down during rest) that needs no per-second traffic from the app
+- [ ] **NOTIF-10**: The rest-timer alert (sound + vibration) fires within about a second of its deadline even with the screen locked and the app fully backgrounded, via a foreground service holding a wake lock — not a scheduled OS alarm
+- [ ] **NOTIF-11**: The ongoing notification exposes working "Skip rest" and "+15s" actions that apply correctly even when the app isn't in the foreground
+- [ ] **NOTIF-12**: Finishing, discarding, or deleting all data removes the notification and stops the service within about a second, with no leaked service or notification afterward
+- [ ] **NOTIF-13**: If notification permission is denied, the app never silently starts a service with nothing visible — it falls back to the existing in-app beep and shows an explanatory banner
+
+### Notification Polish (Phase 9 — not started)
+
+- [ ] **NOTIF-14**: An action tapped on the notification while the app is fully backgrounded or killed is durably queued and correctly replayed into the reducer on resume, without duplication or reordering
+- [ ] **NOTIF-15**: Tapping "Finish" on the notification opens the app into the existing finish-confirmation flow rather than finishing the workout from native code
+- [ ] **NOTIF-16**: The rest-done sound ducks any active music playback instead of talking over it, resuming playback afterward
+- [ ] **NOTIF-17**: Users on aggressive OEM battery managers see in-app guidance on allowlisting the app so the ongoing notification survives
+
 ## v2 Requirements
 
 Deferred to a future release. Tracked but not in this milestone's roadmap.
@@ -117,14 +150,32 @@ Deferred to a future release. Tracked but not in this milestone's roadmap.
 | SUPER-01 | Phase 6 | Complete |
 | SUPER-02 | Phase 6 | Complete |
 | SUPER-03 | Phase 6 | Complete |
+| NOTIF-01 | Phase 7 | Complete |
+| NOTIF-02 | Phase 7 | Complete |
+| NOTIF-03 | Phase 7 | Complete |
+| NOTIF-04 | Phase 7 | Complete |
+| NOTIF-05 | Phase 7 | Complete |
+| NOTIF-06 | Phase 7 | Complete |
+| NOTIF-07 | Phase 7 | Complete |
+| NOTIF-08 | Phase 7 | Complete |
+| NOTIF-09 | Phase 8 | Not started |
+| NOTIF-10 | Phase 8 | Not started |
+| NOTIF-11 | Phase 8 | Not started |
+| NOTIF-12 | Phase 8 | Not started |
+| NOTIF-13 | Phase 8 | Not started |
+| NOTIF-14 | Phase 9 | Not started |
+| NOTIF-15 | Phase 9 | Not started |
+| NOTIF-16 | Phase 9 | Not started |
+| NOTIF-17 | Phase 9 | Not started |
 
 **Coverage:**
 
 - v1 requirements: 16 total, all complete
 - v1.1 requirements: 11 total, all complete
-- Mapped to phases: 27
+- v1.2 requirements: 17 total, 8 complete (Phase 7), 9 not started (Phases 8-9 — require a native Android build environment this session doesn't have)
+- Mapped to phases: 44
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-05*
-*Last updated: 2026-09-05 — v1.1 "Smart Set Flow" shipped: all 11 requirements (ENTRY-01..03, REST-01..05, SUPER-01..03) complete across Phases 5-6. Both v1.0 and v1.1 milestones now fully closed (27/27 requirements).*
+*Last updated: 2026-09-06 — v1.2 "Reliable Alerts" opened: Phase 7 (Notification Foundation) shipped, all 8 requirements (NOTIF-01..08) complete. Phases 8-9 (NOTIF-09..17, the native foreground service and its polish) are planned and documented but not started.*

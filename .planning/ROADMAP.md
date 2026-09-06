@@ -192,3 +192,93 @@ Plans:
 | 6. Structured Sets — Rest Rows & Superset Merge | 2/2 | Complete    | 2026-09-05 |
 
 **v1.1 "Smart Set Flow" shipped 2026-09-05** — all 11 requirements complete (ENTRY-01..03, REST-01..05, SUPER-01..03).
+
+---
+
+# Roadmap: v1.2 — Reliable Alerts
+
+## Overview
+
+Today's rest-timer alert (`beep()` + `navigator.vibrate` in `ActiveWorkout.jsx`) only fires while the `/workout` screen is mounted, driven by a 1Hz `setInterval`. Navigate to Home, lock the phone, or switch apps mid-rest and the countdown keeps running in state but nothing ever alerts the user — for an app whose core value is "never lose track mid-session," an alert that depends on which screen happens to be open is the largest remaining gap. This milestone closes it with a persistent, Spotify-style ongoing notification for the whole workout session, plus alerts (rest done, reminders, PR celebrations) that fire correctly even with the phone locked.
+
+**Platform scope**: this is Android-native work. None of it reaches the GitHub Pages build — the web/prototype experience is unchanged throughout (the in-app beep still works there), and every native call is gated behind `Capacitor.isNativePlatform()`. Verification past Phase 7 requires a real device build (`npx cap sync android` + `gradlew.bat installDebug`), which this environment cannot compile (no Android SDK, Java/Gradle only).
+
+**Architecture, decided up front** (full detail in `07-CONTEXT.md`):
+- Two mechanisms, not four bespoke ones: rest-done + the ongoing notification need sub-second accuracy and process survival, so they get a **custom foreground service**; reminders + PR celebrations are fire-and-forget, so they use **`@capacitor/local-notifications`** as-is.
+- The rest timer avoids `AlarmManager`'s exact-alarm permission entirely — since Android 14 that requires a user-facing system-settings toggle. Instead, the foreground service holds a **time-bounded `PARTIAL_WAKE_LOCK`** for one rest interval and runs an in-process timer: accurate to the second, zero extra permission, negligible battery, because it only ever runs while a workout (and therefore the service) is already active.
+- The ongoing notification's live countdown costs **zero bridge traffic**: `setUsesChronometer` + `setChronometerCountDown` + `setWhen(restUntil)` is a self-ticking display driven entirely by Android's SystemUI, which keeps counting on the lock screen even if the app process is dead.
+- Explicitly **not** `MediaSession`/`MediaStyle`, despite that being Spotify's literal mechanism — it would hijack Bluetooth earbud play/pause, demote the user's actual music in the lock-screen carousel, and (the decisive reason) `MediaStyle` is a custom template that **cannot use the chronometer**, trading away the one feature that makes the notification self-updating.
+
+## Phases
+
+- [x] **Phase 7: Notification Foundation** - The full JS effect layer (idempotent against keystrokes), settings + permission UX, and every trigger that needs zero native code — reminders, PR celebrations, and a provisional rest-done alert (completed 2026-09-06)
+- [ ] **Phase 8: Ongoing Workout Notification** - A custom Android foreground service: persistent Spotify-style notification with a live chronometer, wake-lock-accurate rest alerts, and working Skip/+15s actions
+- [ ] **Phase 9: Notification Polish** - Durable action replay across process death, a native "Finish" deep-link into the existing confirm flow, audio ducking so the rest ding cuts through music, and battery-optimization guidance
+
+## Phase Details
+
+### Phase 7: Notification Foundation
+
+**Goal**: Every notification trigger that can be built without native code is real and working, on a JS effect layer proven immune to the one failure mode that would make it unusable — reaching the native bridge on every keystroke.
+**Mode:** mvp
+**Depends on**: Nothing (first phase of this milestone)
+**Requirements**: NOTIF-01, NOTIF-02, NOTIF-03, NOTIF-04, NOTIF-05, NOTIF-06, NOTIF-07, NOTIF-08
+**Success Criteria** (what must be TRUE):
+
+  1. Settings shows a "Notifications" card (native builds only) with toggles for rest alerts, the ongoing notification, PR celebrations, and reminders, plus a reminder-time picker and live permission status with a re-request button.
+  2. An existing user's persisted settings gain every new notification key at its default value on next load — none read as `undefined` — without a per-key backfill line.
+  3. Notification permission is requested the moment a workout actually starts (any entry point — Home's card or Routine Overview's), not at cold app launch.
+  4. A rest-done notification fires via a scheduled local notification even when Active Workout isn't the foreground screen — strictly better than today's screen-dependent beep, though not yet wake-lock-exact (that's Phase 8).
+  5. Workout reminders derive from the same "next up" schedule Home already surfaces (`dueInfo`/`weekdayName` — no separate scheduling logic), and reschedule automatically whenever a session finishes or the schedule changes.
+  6. A new PR posts a standalone notification only when the app is backgrounded — the existing in-app badge already covers the foreground case, so this never duplicates it.
+  7. Ten consecutive `SET_SET_FIELD` dispatches (a user typing into a weight field) produce zero calls into the native notification bridge — proven by a dedicated test, not just code review.
+  8. No scheduled notification ever triggers Android's exact-alarm permission screen (`isExactNotification: false` everywhere) — confirmed against the plugin's own type definitions, not assumed.
+
+**Plans**: Implemented directly against `07-CONTEXT.md`'s design rather than through separate task-level PLAN.md files — see `07-SUMMARY.md` for what shipped and why.
+
+**UI hint**: yes — a Notifications card in Settings, described in `07-CONTEXT.md`
+
+### Phase 8: Ongoing Workout Notification
+
+**Goal**: The rest alert and the persistent session notification are backed by a real Android foreground service, closing the gap Phase 7's scheduled notification deliberately left open (OS-alarm drift under battery optimization).
+**Mode:** mvp
+**Depends on**: Phase 7 (the JS effect layer, settings, and permission plumbing this phase's native service plugs into)
+**Requirements**: NOTIF-09, NOTIF-10, NOTIF-11, NOTIF-12, NOTIF-13
+**Success Criteria** (what must be TRUE):
+
+  1. Starting a workout shows a persistent notification with the routine/exercise name and a live, self-ticking chronometer (counting up normally, counting down during rest) that requires no per-second traffic from the app.
+  2. With the phone locked and the app fully backgrounded, the rest-done alert (sound + vibration) fires within about a second of the deadline — verified after forcing device idle, not just under normal conditions.
+  3. The notification exposes working "Skip rest" and "+15s" actions that apply correctly even when tapped with the app not in the foreground.
+  4. Finishing, discarding, or deleting all data removes the notification and stops the service within about a second, with no leaked service or notification left behind afterward.
+  5. If notification permission is denied, the service never starts silently with nothing visible — the app falls back to the existing in-app beep and shows a banner explaining why.
+
+**Plans**: Not yet started — see `08-CONTEXT.md` for the native architecture (foreground service type, manifest changes, file list, verification script) worked out ahead of implementation.
+
+**UI hint**: no new screens — the "UI" is the Android notification itself, specified in `08-CONTEXT.md`
+
+### Phase 9: Notification Polish
+
+**Goal**: The rough edges deliberately deferred out of Phase 8 — action durability across a killed process, a proper native path to finishing a workout, and real-world usability (music ducking, battery-manager guidance) — are closed.
+**Mode:** mvp
+**Depends on**: Phase 8 (polishes the foreground service's action-handling and lifecycle)
+**Requirements**: NOTIF-14, NOTIF-15, NOTIF-16, NOTIF-17
+**Success Criteria** (what must be TRUE):
+
+  1. An action tapped on the notification while the app is fully backgrounded or killed is still applied correctly once the app resumes — queued durably, replayed in order, never duplicated.
+  2. Tapping "Finish" on the notification opens the app straight into the existing finish-confirmation flow rather than finishing the workout from native code (which doesn't have the logic to build a session).
+  3. The rest-done sound ducks any active music playback (e.g. Spotify) instead of talking over it, and playback resumes automatically afterward.
+  4. Settings (or an in-app prompt) tells a user on an aggressive OEM battery manager (Xiaomi/Samsung/OnePlus-class) how to allowlist the app, rather than the ongoing notification silently dying with no explanation.
+
+**Plans**: Not yet started — see `09-CONTEXT.md`.
+
+**UI hint**: minor — one guidance banner/row, no new screens
+
+## Progress (v1.2 — Reliable Alerts)
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 7. Notification Foundation | Implemented directly | Complete | 2026-09-06 |
+| 8. Ongoing Workout Notification | 0 | Not started | — |
+| 9. Notification Polish | 0 | Not started | — |
+
+**Phase 7 of v1.2 shipped 2026-09-06** — 8 of 17 requirements complete (NOTIF-01..08). Phases 8-9 (NOTIF-09..17) require a real Android build environment this session doesn't have and are picked up separately.

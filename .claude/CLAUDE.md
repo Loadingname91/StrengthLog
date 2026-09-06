@@ -13,7 +13,7 @@ A mobile-first, fully offline workout tracker for Android (React + Vite + Capaci
 - **Tech stack**: React 19, Vite, Tailwind v4, react-router v7, Capacitor 8 (Android only) — stay within this stack, no new frameworks
 - **Data**: fully local via `localStorage`, offline-first — no backend/sync work in this milestone
 - **Platform**: Android via Capacitor; native build runs from `android/` on Windows (`gradlew.bat`), web assets rebuilt via `npm run build && npx cap sync android` before each native install
-- **Testing**: no framework installed yet; introducing one (recommended: Vitest + Testing Library per `.planning/codebase/TESTING.md`) is explicitly in scope this milestone
+- **Testing**: Vitest + Testing Library, installed and in active use since Phase 4 (v1.0) — 115 tests across 14 files as of Phase 7 (v1.2)
 
 <!-- GSD:project-end -->
 
@@ -41,7 +41,7 @@ A mobile-first, fully offline workout tracker for Android (React + Vite + Capaci
 - React DOM 19.2.8 - Web rendering target
 - React Router DOM 7.18.3 - Client-side routing, used in `src/App.jsx`
 - Capacitor 8.5.1 (`@capacitor/core`, `@capacitor/android`, `@capacitor/app`, `@capacitor/cli`) - Native app shell/bridge for packaging the web app as an Android app; config at `capacitor.config.json` (appId `com.fitlog.app`, appName `FitLog`, webDir `dist`)
-- None detected. No test runner (Jest/Vitest/etc.), no test config files, no `*.test.*`/`*.spec.*` files found in `src/`.
+- Vitest 5.x + Testing Library (`@testing-library/react`, `@testing-library/jest-dom`) — introduced in v1.0 Phase 4, in active use since. Config in `vite.config.js` (`environment: 'jsdom'`, `setupFiles: ['./src/test/setup.js']`). 14 `*.test.js`/`*.test.jsx` files, 115 tests, run via `npm test`.
 - Vite 8.2.2 - Dev server and production bundler, config at `vite.config.js`
 - `@vitejs/plugin-react` 6.1.0 - React fast-refresh/JSX support for Vite
 - `@tailwindcss/vite` 4.3.3 - Tailwind CSS v4 Vite plugin (CSS-first config, no separate `tailwind.config.js` detected)

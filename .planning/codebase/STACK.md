@@ -31,7 +31,7 @@
 - Capacitor 8.5.1 (`@capacitor/core`, `@capacitor/android`, `@capacitor/app`, `@capacitor/cli`) - Native app shell/bridge for packaging the web app as an Android app; config at `capacitor.config.json` (appId `com.fitlog.app`, appName `FitLog`, webDir `dist`)
 
 **Testing:**
-- None detected. No test runner (Jest/Vitest/etc.), no test config files, no `*.test.*`/`*.spec.*` files found in `src/`.
+- Vitest 5.x + Testing Library (`@testing-library/react`, `@testing-library/jest-dom`) — introduced in v1.0 Phase 4, in active use since. Config in `vite.config.js` (`environment: 'jsdom'`, `setupFiles: ['./src/test/setup.js']`). 14 `*.test.js`/`*.test.jsx` files, 115 tests, run via `npm test`.
 
 **Build/Dev:**
 - Vite 8.2.2 - Dev server and production bundler, config at `vite.config.js`

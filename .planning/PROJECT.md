@@ -32,12 +32,19 @@ Logging a workout mid-session — weight, reps, RIR, rest — must be fast, reli
 - ✓ Active Workout's weight/reps inputs enlarged to a touch-friendly size, with a confirm-to-advance focus chain (Weight → Reps → next set's Weight) and auto-mark-done once both fields are valid — the checkmark stays a manual override — Phase 5
 - ✓ Routine Builder's block editor replaces the flat "Sets" count with an explicit, editable sequence of set/round and rest rows — rest is addable/removable/individually editable, defaulting new rows from Settings' "Default rest (sec)" — Phase 6
 - ✓ Merging exercises into a superset produces a sequence that alternates rounds with rest only after each full round; Active Workout renders a merged superset as one interleaved flow (both exercises' current round together) and auto-advances between them using the same focus chain Phase 5 built — Phase 6
+- ✓ Custom exercises (created in-app, not in the static catalog) now resolve correctly everywhere — muscle heatmap, insights, goal progress, CSV export, and every screen that shows an exercise name — instead of being silently skipped or shown as a raw internal id — post-milestone fix
+- ✓ Home/Stats overview chart redesigned with axis gridlines, value labels, an area fill, and point markers, replacing a bare unlabeled polyline — post-milestone fix
+- ✓ Insight surfaces rebuilt around delta numbers and comparisons instead of sparse line charts: a fixed-range sets-per-muscle band (not scaled to the user's own busiest muscle), a "this week vs. 4-week average" card, a GitHub-style consistency calendar, and a recent-PRs list — post-milestone feature
+- ✓ Static GitHub Pages deployment of the web build for layout/prototype testing on a phone browser, with SPA routing fixed via a `BrowserRouter` `basename` (`import.meta.env.BASE_URL`) so the app isn't limited to native-device testing during iteration — post-milestone infra
+- ✓ Notification effect layer, settings, permission UX, and every trigger buildable without native code (reminders, PR celebrations, a provisional rest-done alert) — Phase 7 (v1.2)
 
 ### Active
 
 v1.0 stabilization milestone: none — all requirements validated and shipped.
 
 v1.1 "Smart Set Flow" milestone: none — all requirements validated and shipped.
+
+v1.2 "Reliable Alerts" milestone: Phase 8 (Ongoing Workout Notification — the custom Android foreground service) and Phase 9 (Notification Polish) are designed (`.planning/phases/08-ongoing-notification/08-CONTEXT.md`, `09-notification-polish/09-CONTEXT.md`) but not started — both require a real Android build environment (Java/SDK + device) that this session doesn't have.
 
 ### Out of Scope
 
@@ -46,6 +53,43 @@ v1.1 "Smart Set Flow" milestone: none — all requirements validated and shipped
 
 ## Context
 
+- **v1.2 "Reliable Alerts" opened and Phase 7 shipped 2026-09-06.** Prompted
+  directly by the user asking for Spotify-style background notifications and
+  a lock-screen mini-player for the workout timer. Investigation found the
+  existing rest-timer alert only fires while `/workout` is the mounted
+  screen — a real gap given the core value statement. Architecture (full
+  detail in `07-CONTEXT.md`): two mechanisms, not four bespoke ones — a
+  custom Android foreground service for anything needing sub-second accuracy
+  or process survival (the ongoing notification, the rest ding), and
+  `@capacitor/local-notifications` as-is for anything fire-and-forget
+  (reminders, PR celebrations). The foreground service avoids
+  `AlarmManager`'s exact-alarm permission (a user-facing system toggle since
+  Android 14) entirely by holding a **time-bounded wake lock for one rest
+  interval** instead — accurate, permission-free, since it only ever runs
+  while a workout (and the service) is already active. The live countdown
+  on the ongoing notification costs zero bridge traffic via Android's own
+  `setUsesChronometer`/`setChronometerCountDown`. Explicitly not
+  `MediaSession`/`MediaStyle` despite that being Spotify's literal mechanism
+  — decisive reason: `MediaStyle` is a custom template that cannot use the
+  chronometer, which would trade away the one feature that makes the
+  notification self-updating without the app running. Sequenced so
+  everything testable landed before any native code: Phase 7 (this session)
+  is pure JS + the local-notifications plugin, fully verified by 115 passing
+  tests and a real-browser check with zero native code written; Phase 8 (the
+  actual foreground service) and Phase 9 (polish) are designed but require a
+  native build environment — Java/SDK + device — this session doesn't have,
+  so they're picked up separately. One real finding worth flagging:
+  `@capacitor/local-notifications` defaults every scheduled notification to
+  requesting an *exact* alarm, which on API 31+ opens the system "Alarms &
+  reminders" settings screen the first time it's needed — exactly the
+  permission flow this design was built to avoid. Caught by reading the
+  plugin's actual type definitions rather than assuming; every scheduled
+  call here explicitly sets `isExactNotification: false`. Three real
+  rest-timer bugs were also found and fixed while building the data layer
+  the notifications depend on: `REST_ADJUST` was unclamped (repeated "-15s"
+  could push the deadline into the past), the ding-played guard couldn't
+  fire twice for a new deadline, and two sets sharing a rest duration could
+  both show as "active" simultaneously.
 - **v1.1 "Smart Set Flow" milestone shipped 2026-09-05**, same day it was opened.
   Three related asks from real use: (1) weight/reps entry needed bigger inputs
   and fewer taps on a phone; (2) rest needed to be an explicit, editable part
@@ -81,7 +125,7 @@ v1.1 "Smart Set Flow" milestone: none — all requirements validated and shipped
 - **Tech stack**: React 19, Vite, Tailwind v4, react-router v7, Capacitor 8 (Android only) — stay within this stack, no new frameworks
 - **Data**: fully local via `localStorage`, offline-first — no backend/sync work in this milestone
 - **Platform**: Android via Capacitor; native build runs from `android/` on Windows (`gradlew.bat`), web assets rebuilt via `npm run build && npx cap sync android` before each native install
-- **Testing**: no framework installed yet; introducing one (recommended: Vitest + Testing Library per `.planning/codebase/TESTING.md`) is explicitly in scope this milestone
+- **Testing**: Vitest + Testing Library, installed and in active use since Phase 4 (v1.0) — 115 tests across 14 files as of Phase 7 (v1.2)
 
 ## Key Decisions
 
@@ -98,6 +142,11 @@ v1.1 "Smart Set Flow" milestone: none — all requirements validated and shipped
 | Merged supersets auto-advance with one interleaved view, not manual tab-switching | User's explicit choice, confirmed as "the bigger, more involved change" before proceeding | Shipped — Phase 6 |
 | Fast set entry does both auto-advance-focus and auto-mark-done, not one or the other | User selected "both" over either alone | Shipped — Phase 5 |
 | Superset runtime uses a flat `restAfter`/`exerciseIndex` design instead of the originally-sketched nested step-type model | Surfaced while writing the actual reducer code — a much smaller diff, and it means Phase 5's focus-chain already handles cross-exercise auto-advance with no new navigation state needed | Shipped — Phase 6 |
+| A custom Android foreground service (not `@capacitor/local-notifications` alone) for the ongoing notification and rest alert | Needs sub-second accuracy with the screen off and process survival across backgrounding; the plugin alone has no chronometer and no foreground-service protection | Designed — Phase 8, not yet built |
+| A time-bounded wake lock + in-process timer instead of `AlarmManager`'s exact alarms | Exact alarms need `SCHEDULE_EXACT_ALARM`, a user-facing system-settings toggle since Android 14; the wake lock needs no extra permission and only ever runs while the service (i.e. a workout) is already active | Designed — Phase 8 |
+| No MediaSession/MediaStyle despite that being Spotify's literal mechanism | Would hijack Bluetooth earbud play/pause, demote the user's own music in the lock-screen carousel, and — decisively — `MediaStyle` is a custom template that can't use the chronometer, trading away the one thing that makes the notification self-updating | Decided — Phase 8 design |
+| `isExactNotification: false` on every `@capacitor/local-notifications` call | The plugin defaults to requesting an exact alarm, which opens a system settings screen on first use — the exact permission flow this design exists to avoid; found by reading the plugin's type definitions, not assumed | Shipped — Phase 7 |
+| Phase 7 (JS layer + local-notifications) executed directly against `07-CONTEXT.md` rather than through separate task-level PLAN.md files | The design was already fully specified and reviewed before implementation; splitting it into formal plan documents would have added ceremony without changing what got built | Shipped — Phase 7 |
 
 ## Evolution
 
@@ -117,4 +166,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-05 after initialization*
+*Last updated: 2026-09-06 — v1.2 "Reliable Alerts" opened, Phase 7 (Notification Foundation) shipped.*
