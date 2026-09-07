@@ -72,7 +72,22 @@ export default function CsvImport() {
     const { headers: h, rows: r } = parseCSV(text)
     setHeaders(h)
     setRows(r)
-    setMapping(mode === 'routines' ? guessRoutineMapping(h) : guessMapping(h))
+
+    let nextMode = mode
+    const workoutMapping = guessMapping(h)
+    const routineMapping = guessRoutineMapping(h)
+
+    const workoutMatches = workoutMapping.filter((m) => m !== 'Ignore this column').length
+    const routineMatches = routineMapping.filter((m) => m !== 'Ignore this column').length
+
+    if (routineMatches > workoutMatches + 1) {
+      nextMode = 'routines'
+    } else if (workoutMatches > routineMatches + 1) {
+      nextMode = 'workouts'
+    }
+
+    if (nextMode !== mode) setMode(nextMode)
+    setMapping(nextMode === 'routines' ? routineMapping : workoutMapping)
     setStep(1)
   }
 

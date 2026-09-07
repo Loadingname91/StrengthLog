@@ -48,11 +48,18 @@ const HEADER_GUESSES = {
   Notes: ['notes', 'comment', 'comments'],
 }
 
+function matchHeader(lower, g) {
+  if (lower === g) return true
+  const cleanLower = ' ' + lower.replace(/[^a-z0-9]+/g, ' ') + ' '
+  const cleanG = ' ' + g.replace(/[^a-z0-9]+/g, ' ') + ' '
+  return cleanLower.includes(cleanG)
+}
+
 export function guessMapping(headers) {
   return headers.map((h) => {
     const lower = h.toLowerCase()
     for (const [field, guesses] of Object.entries(HEADER_GUESSES)) {
-      if (guesses.some((g) => lower === g || lower.includes(g))) return field
+      if (guesses.some((g) => matchHeader(lower, g))) return field
     }
     return 'Ignore this column'
   })
@@ -89,7 +96,7 @@ export function guessRoutineMapping(headers) {
   return headers.map((h) => {
     const lower = h.toLowerCase()
     for (const [field, guesses] of Object.entries(ROUTINE_HEADER_GUESSES)) {
-      if (guesses.some((g) => lower === g || lower.includes(g))) return field
+      if (guesses.some((g) => matchHeader(lower, g))) return field
     }
     return 'Ignore this column'
   })

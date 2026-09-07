@@ -24,6 +24,59 @@ export function buildRoutineCandidates(headers, rows, mapping, customExercises) 
   const iSecondary = idx('Secondary muscle')
   const iEquipment = idx('Equipment')
 
+  const MUSCLE_ALIASES = {
+    quads: 'Legs',
+    quadriceps: 'Legs',
+    hamstrings: 'Legs',
+    calves: 'Legs',
+    abs: 'Core',
+    abdominals: 'Core',
+    lats: 'Back',
+    'upper back': 'Back',
+    'lower back': 'Back',
+    'mid back': 'Back',
+    traps: 'Shoulders',
+    'upper chest': 'Chest',
+    'lower chest': 'Chest',
+    pecs: 'Chest',
+    'front delts': 'Shoulders',
+    'side delts': 'Shoulders',
+    'rear delts': 'Shoulders',
+    delts: 'Shoulders',
+    rhomboids: 'Back',
+    'rotator cuff': 'Shoulders',
+    adductors: 'Legs',
+    abductors: 'Legs',
+    'hip flexors': 'Legs',
+    forearms: 'Biceps',
+    brachialis: 'Biceps',
+  }
+
+  const EQUIPMENT_ALIASES = {
+    dumbbells: 'Dumbbell',
+    'ez-bar': 'Barbell',
+    band: 'Cable',
+    'smith machine': 'Machine',
+  }
+
+  function normalizeMuscle(m) {
+    if (!m) return ''
+    const first = m.split(/[,/]/)[0].trim().toLowerCase()
+    if (MUSCLE_ALIASES[first]) return MUSCLE_ALIASES[first]
+    const cap = first.charAt(0).toUpperCase() + first.slice(1)
+    if (MUSCLES.includes(cap)) return cap
+    return m.trim() // return original to be flagged if no match
+  }
+
+  function normalizeEquipment(e) {
+    if (!e) return ''
+    const first = e.split(/[,/]/)[0].trim().toLowerCase()
+    if (EQUIPMENT_ALIASES[first]) return EQUIPMENT_ALIASES[first]
+    const cap = first.charAt(0).toUpperCase() + first.slice(1)
+    if (EQUIPMENT.includes(cap)) return cap
+    return e.trim()
+  }
+
   return rows.map((row, i) => {
     const routineName = iRoutine >= 0 ? row[iRoutine]?.trim() : ''
     const supersetGroup = iGroup >= 0 ? row[iGroup]?.trim() : ''
@@ -34,8 +87,8 @@ export function buildRoutineCandidates(headers, rows, mapping, customExercises) 
     const rest = iRest >= 0 ? parseInt(row[iRest], 10) : NaN
     const rir = iRir >= 0 && row[iRir] !== '' ? Number(row[iRir]) : null
     const targetWeight = iTargetWeight >= 0 && row[iTargetWeight] !== '' ? Number(row[iTargetWeight]) : null
-    const primary = iPrimary >= 0 ? row[iPrimary]?.trim() : ''
-    const secondary = iSecondary >= 0 ? row[iSecondary]?.trim() : ''
+    const primary = iPrimary >= 0 ? normalizeMuscle(row[iPrimary]) : ''
+    const secondary = iSecondary >= 0 ? normalizeMuscle(row[iSecondary]) : ''
     const equipment = iEquipment >= 0 ? row[iEquipment]?.trim() : ''
 
     const matched = exerciseName ? matchExercise(exerciseName, customExercises) : null
