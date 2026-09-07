@@ -238,7 +238,14 @@ export default function Home() {
               )}
             </div>
             <Card>
-              <CalendarHeatmap tallies={tallies} weeks={12} onDayClick={() => navigate('/stats/log')} />
+              <CalendarHeatmap
+                tallies={tallies}
+                weeks={12}
+                onDayClick={(iso) => {
+                  const daySessions = state.sessions.filter((s) => s.date === iso)
+                  navigate(daySessions.length === 1 ? `/session/${daySessions[0].id}` : '/stats/log')
+                }}
+              />
             </Card>
           </div>
 

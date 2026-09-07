@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  bestProductForExercise, totalVolume, totalReps, totalSets, muscleSetCounts, exerciseSetCounts,
+  bestProductForExercise, recomputePRFlags, totalVolume, totalReps, totalSets, muscleSetCounts, exerciseSetCounts,
   recentPRs, dayTallies, weekStreak, exerciseProgress, epley1RM,
 } from './selectors'
 import { localISODate } from './format'
@@ -59,6 +59,44 @@ describe('bestProductForExercise', () => {
 
   it('returns 0 when the exercise has no history', () => {
     expect(bestProductForExercise(sessions, 'never-logged')).toBe(0)
+  })
+})
+
+describe('recomputePRFlags', () => {
+  it('promotes a later set to PR once the earlier session that beat it is removed', () => {
+    const sessions = [
+      session({
+        id: 's1',
+        date: '2026-01-01',
+        prCount: 0,
+        entries: [{ exerciseId: 'bench-press', sets: [{ weight: 60, reps: 10, isPR: false }] }],
+      }),
+    ]
+
+    const [recomputed] = recomputePRFlags(sessions)
+    expect(recomputed.entries[0].sets[0].isPR).toBe(true)
+    expect(recomputed.prCount).toBe(1)
+  })
+
+  it('does not mark a set PR when an earlier session already beat it', () => {
+    const sessions = [
+      session({ id: 's1', date: '2026-01-01', entries: [{ exerciseId: 'bench-press', sets: [{ weight: 100, reps: 10 }] }] }),
+      session({ id: 's2', date: '2026-01-02', entries: [{ exerciseId: 'bench-press', sets: [{ weight: 60, reps: 10 }] }] }),
+    ]
+
+    const [, s2] = recomputePRFlags(sessions)
+    expect(s2.entries[0].sets[0].isPR).toBe(false)
+    expect(s2.prCount).toBe(0)
+  })
+
+  it('preserves the original array order regardless of session date order', () => {
+    const sessions = [
+      session({ id: 's2', date: '2026-01-02', entries: [] }),
+      session({ id: 's1', date: '2026-01-01', entries: [] }),
+    ]
+
+    const result = recomputePRFlags(sessions)
+    expect(result.map((s) => s.id)).toEqual(['s2', 's1'])
   })
 })
 

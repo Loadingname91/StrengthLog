@@ -29,6 +29,9 @@ export default function ActiveWorkout() {
   const [confirmFinish, setConfirmFinish] = useState(false)
   const [helpFor, setHelpFor] = useState(null)
   const [prBadge, setPrBadge] = useState(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [confirmRestart, setConfirmRestart] = useState(false)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   const dingPlayedFor = useRef(null)
   const finishingRef = useRef(false)
   const weightRefs = useRef({})
@@ -133,12 +136,27 @@ export default function ActiveWorkout() {
   return (
     <div className="relative flex h-screen flex-col">
       <div className="flex-1 overflow-auto pb-24">
-        <div className="px-[18px] pb-2 pt-3.5">
+        <div className="relative px-[18px] pb-2 pt-3.5">
           <div className="flex items-center justify-between gap-2">
             <button onClick={() => navigate('/routines')} className="-ml-1.5 shrink-0 p-1.5"><BackIcon /></button>
             <div className="min-w-0 flex-1 truncate text-center text-[15px] font-semibold">{aw.routineName}</div>
             <div className="tabular-nums shrink-0 text-sm font-semibold" style={{ color: 'var(--accent-dark)' }}>{fmtElapsed(elapsedSec)}</div>
+            <button onClick={() => setMenuOpen((v) => !v)} className="-mr-1.5 shrink-0 px-1.5 text-lg" style={{ color: 'var(--muted)' }}>⋮</button>
           </div>
+
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-[5]" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-3 top-12 z-10 flex flex-col overflow-hidden rounded-xl border shadow-lg" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+                <button onClick={() => { setMenuOpen(false); setConfirmRestart(true) }} className="whitespace-nowrap px-4 py-2.5 text-left text-sm">
+                  Restart workout
+                </button>
+                <button onClick={() => { setMenuOpen(false); setConfirmDiscard(true) }} className="whitespace-nowrap px-4 py-2.5 text-left text-sm" style={{ color: 'var(--danger)' }}>
+                  Discard workout
+                </button>
+              </div>
+            </>
+          )}
           <div className="mt-2 h-[5px] overflow-hidden rounded-full" style={{ background: 'var(--surface-alt)' }}>
             <div className="h-full rounded-full transition-[width]" style={{ width: `${progressPct}%`, background: 'var(--accent)' }} />
           </div>
@@ -344,6 +362,27 @@ export default function ActiveWorkout() {
         confirmLabel="Finish anyway"
         onCancel={() => setConfirmFinish(false)}
         onConfirm={doFinish}
+      />
+
+      <ConfirmSheet
+        open={confirmRestart}
+        title="Restart this workout?"
+        body="Every logged set will be cleared and the routine will start over from the top."
+        confirmLabel="Restart"
+        danger
+        onCancel={() => setConfirmRestart(false)}
+        onConfirm={() => { dispatch({ type: 'RESTART_WORKOUT' }); setConfirmRestart(false) }}
+      />
+
+      <ConfirmSheet
+        open={confirmDiscard}
+        title="Discard this workout?"
+        body="Nothing logged in this session will be saved."
+        confirmLabel="Discard"
+        danger
+        holdToConfirm
+        onCancel={() => setConfirmDiscard(false)}
+        onConfirm={() => { dispatch({ type: 'DISCARD_WORKOUT' }); setConfirmDiscard(false) }}
       />
     </div>
   )

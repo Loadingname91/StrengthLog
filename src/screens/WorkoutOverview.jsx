@@ -1,8 +1,9 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useStore } from '../state/StoreContext'
 import { useToast } from '../state/ToastContext'
 import Sparkline from '../components/Sparkline'
+import ConfirmSheet from '../components/ConfirmSheet'
 import { BackIcon, ShareIcon, ClockIcon } from '../components/Icons'
 import { exerciseById } from '../lib/exercises'
 import { blockTarget, workoutCtaLabel } from '../lib/format'
@@ -28,6 +29,7 @@ export default function WorkoutOverview() {
   const { state, dispatch, exercises } = useStore()
   const navigate = useNavigate()
   const { showToast } = useToast()
+  const [conflict, setConflict] = useState(false)
 
   const routine = state.routines.find((r) => r.id === id)
 
@@ -54,10 +56,20 @@ export default function WorkoutOverview() {
   const exerciseCount = routine.blocks.reduce((s, b) => s + b.exerciseIds.length, 0)
 
   function start() {
-    // A workout is already in progress — resume it instead of silently
-    // discarding it. Mirrors BottomNav's handleLog resume behavior.
+    // A workout for a DIFFERENT routine is already in progress — this is
+    // the one screen where the user picked a specific routine to start, so
+    // silently resuming the old one instead would be wrong. Offer to
+    // discard it rather than doing so without asking.
+    if (state.activeWorkout && state.activeWorkout.routineId !== routine.id) { setConflict(true); return }
     if (state.activeWorkout) { navigate('/workout'); return }
     dispatch({ type: 'START_WORKOUT', payload: { routineId: routine.id } })
+    navigate('/workout')
+  }
+
+  function discardAndStart() {
+    dispatch({ type: 'DISCARD_WORKOUT' })
+    dispatch({ type: 'START_WORKOUT', payload: { routineId: routine.id } })
+    setConflict(false)
     navigate('/workout')
   }
 
@@ -134,6 +146,16 @@ export default function WorkoutOverview() {
           </div>
         ))}
       </div>
+
+      <ConfirmSheet
+        open={conflict}
+        title="A workout is already in progress"
+        body="Starting this routine will discard the workout you're currently running."
+        confirmLabel="Discard & start new"
+        danger
+        onCancel={() => setConflict(false)}
+        onConfirm={discardAndStart}
+      />
     </div>
   )
 }

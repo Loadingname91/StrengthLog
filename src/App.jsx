@@ -15,6 +15,7 @@ import WorkoutOverview from './screens/WorkoutOverview'
 import ActiveWorkout from './screens/ActiveWorkout'
 import WorkoutSummary from './screens/WorkoutSummary'
 import ExerciseDetail from './screens/ExerciseDetail'
+import SessionDetail from './screens/SessionDetail'
 import Measurements from './screens/Measurements'
 import CsvImport from './screens/CsvImport'
 import ExportInsights from './screens/ExportInsights'
@@ -81,6 +82,7 @@ function Shell() {
             <Route path="/workout" element={<ActiveWorkout />} />
             <Route path="/workout/summary" element={<WorkoutSummary />} />
             <Route path="/exercise/:id" element={<ExerciseDetail />} />
+            <Route path="/session/:id" element={<SessionDetail />} />
             <Route path="/measurements" element={<Measurements />} />
             <Route path="/csv-import" element={<CsvImport />} />
             <Route path="/export" element={<ExportInsights />} />

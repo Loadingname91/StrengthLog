@@ -137,6 +137,34 @@ export function bestProductForExercise(sessions, exerciseId, beforeDate) {
   return best
 }
 
+// Re-derives every set's isPR flag (and each session's prCount) from
+// scratch, in date order, using the same weight*reps product rule as
+// bestProductForExercise. Needed after a session is deleted from the
+// middle of history — a later set that lost to it now might be a PR, and
+// the deleted session's own PR sets must stop counting anywhere. Original
+// array order (not date order) is preserved in the result.
+export function recomputePRFlags(sessions) {
+  const best = {}
+  const byId = new Map(
+    [...sessions]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((session) => {
+        let prCount = 0
+        const entries = session.entries.map((entry) => ({
+          ...entry,
+          sets: entry.sets.map((set) => {
+            const product = set.weight * set.reps
+            const isPR = product > (best[entry.exerciseId] || 0)
+            if (isPR) { best[entry.exerciseId] = product; prCount += 1 }
+            return { ...set, isPR }
+          }),
+        }))
+        return [session.id, { ...session, entries, prCount }]
+      })
+  )
+  return sessions.map((s) => byId.get(s.id))
+}
+
 const REP_BUCKETS = [5, 8, 12]
 export function prByRepRange(sessions, exerciseId) {
   const table = Object.fromEntries(REP_BUCKETS.map((b) => [b, 0]))
