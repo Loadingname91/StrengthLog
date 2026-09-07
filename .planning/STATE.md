@@ -113,6 +113,12 @@ Carried-forward notes from v1.0/v1.1:
 - Still open, deliberately not addressed (see `CONCERNS.md`): `reducer.js`/large-screen splitting, Prettier adoption, debounced saves, `localStorage`→IndexedDB migration, full corrupted-data recovery UI. None are regressions — pre-existing or newly-noted scaling/maintainability items for a future milestone, not blocking.
 - Known limitation carried from Phase 2, more visible now that supersets render together: target weight is a single block-level value applied identically to every exercise in a superset pair (e.g. bench press and barbell row would share one target weight if both set). Not introduced or fixed by Phase 6 — noted in `06-02-SUMMARY.md`.
 
+## Quick Tasks Completed
+
+| Date | Task | Slug | Status |
+|------|------|------|--------|
+| 2026-09-07 | Resume CTA labels + set-done checkmark glow | `resume-cta-labels-and-set-done-checkmark` | complete ✓ |
+
 ## Deferred Items
 
 Items acknowledged and carried forward from previous milestone close:
