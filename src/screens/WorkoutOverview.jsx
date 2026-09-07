@@ -5,7 +5,7 @@ import { useToast } from '../state/ToastContext'
 import Sparkline from '../components/Sparkline'
 import { BackIcon, ShareIcon, ClockIcon } from '../components/Icons'
 import { exerciseById } from '../lib/exercises'
-import { blockTarget } from '../lib/format'
+import { blockTarget, workoutCtaLabel } from '../lib/format'
 import { topSetSparklinePoints } from '../lib/selectors'
 import { backfillSequence, sequenceSetCount } from '../lib/blocks'
 
@@ -108,10 +108,13 @@ export default function WorkoutOverview() {
           className="flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-base font-semibold text-white"
           style={{ background: 'var(--accent)' }}
         >
-          Start Workout
-          <span className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ background: 'rgba(255,255,255,0.25)' }}>
-            <ClockIcon size={12} />~{estimateDuration(routine)}m
-          </span>
+          {workoutCtaLabel(state.activeWorkout, routine.id)}
+          {/* The estimate describes a fresh run, so it only makes sense before one starts. */}
+          {!state.activeWorkout && (
+            <span className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ background: 'rgba(255,255,255,0.25)' }}>
+              <ClockIcon size={12} />~{estimateDuration(routine)}m
+            </span>
+          )}
         </button>
       </div>
 

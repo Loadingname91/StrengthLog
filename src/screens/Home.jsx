@@ -13,7 +13,7 @@ import {
   dayTallies, weekStreak, trailingComparison, recentPRs,
 } from '../lib/selectors'
 import { regionIntensities } from '../lib/muscles'
-import { daysAgo, fmtDate } from '../lib/format'
+import { daysAgo, fmtDate, workoutCtaLabel } from '../lib/format'
 import { exerciseById } from '../lib/exercises'
 import { dueInfo, weekdayName } from '../lib/schedule'
 
@@ -109,7 +109,7 @@ export default function Home() {
               className="mt-3.5 w-full rounded-2xl py-3.5 text-base font-semibold text-white"
               style={{ background: 'var(--accent)' }}
             >
-              Start Workout
+              {workoutCtaLabel(state.activeWorkout, nextRoutine.id)}
             </button>
             {schedule?.isOverdue && (
               <button
@@ -164,7 +164,7 @@ export default function Home() {
               className="mt-4 rounded-2xl px-6 py-3 text-sm font-semibold text-white"
               style={{ background: 'var(--accent)' }}
             >
-              Start Workout
+              {workoutCtaLabel(state.activeWorkout, nextRoutine.id)}
             </button>
           )}
         </div>
