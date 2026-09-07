@@ -9,7 +9,7 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.MediaPlayer
-import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -277,6 +277,12 @@ class WorkoutService : Service() {
     // (AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK) so concurrent music (Spotify,
     // etc.) ducks instead of being talked over or drowning out the ding —
     // the channel-default notification sound this replaced did neither.
+    //
+    // Plays the bundled res/raw/fitlog_chime asset, not
+    // RingtoneManager.getDefaultUri() — the phone's own default
+    // notification sound can be (and commonly is) set to silent, which
+    // would make this fire with no audible result despite the ducking
+    // working correctly. A bundled asset has no such dependency.
     private fun playDuckedDing() {
         val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         val attrs = AudioAttributes.Builder()
@@ -302,7 +308,8 @@ class WorkoutService : Service() {
         val player = MediaPlayer()
         try {
             player.setAudioAttributes(attrs)
-            player.setDataSource(this, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+            val chimeUri = Uri.parse("android.resource://$packageName/${R.raw.fitlog_chime}")
+            player.setDataSource(this, chimeUri)
             player.setOnCompletionListener {
                 it.release()
                 abandonDuckingFocus()
