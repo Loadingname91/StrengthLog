@@ -3,6 +3,7 @@ import { blockTarget, todayISO, localISODate } from '../lib/format'
 import { bestProductForExercise, totalVolume } from '../lib/selectors'
 import { backfillSequence } from '../lib/blocks'
 import { uid } from '../lib/id'
+import { nextFreeSeq } from '../lib/reminderPlan'
 
 export function initialSettings() {
   return {
@@ -13,8 +14,6 @@ export function initialSettings() {
     notifyRestDone: true,
     notifyOngoing: true,
     notifyPR: true,
-    notifyReminders: false,
-    reminderTime: '18:00',
   }
 }
 
@@ -118,6 +117,23 @@ export function reducer(state, action) {
       else weekdayAssignments[action.payload.routineId] = action.payload.weekday
       return { ...state, weekdayAssignments }
     }
+
+    case 'ADD_REMINDER': {
+      // seq indexes the reminder's reserved block of notification ids, so it
+      // has to be unique among live reminders — never patched afterwards.
+      const seq = nextFreeSeq(state.reminders)
+      if (seq == null) return state
+      const reminder = { id: uid('rem'), seq, enabled: true, mode: 'auto', time: '18:00', days: [], label: '', ...action.payload }
+      return { ...state, reminders: [...state.reminders, reminder] }
+    }
+
+    case 'UPDATE_REMINDER': {
+      const reminders = state.reminders.map((r) => (r.id === action.payload.id ? { ...r, ...action.payload.patch } : r))
+      return { ...state, reminders }
+    }
+
+    case 'DELETE_REMINDER':
+      return { ...state, reminders: state.reminders.filter((r) => r.id !== action.payload) }
 
     case 'RESTART_SCHEDULE':
       return { ...state, scheduleRestartAt: todayISO() }

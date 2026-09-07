@@ -12,6 +12,8 @@ vi.mock('../lib/nativeNotifications', () => ({
   ensureChannels: vi.fn(),
   requestNotificationPermission: vi.fn(),
   checkNotificationPermission: vi.fn(),
+  checkExactAlarmPermission: vi.fn(),
+  openExactAlarmSettings: vi.fn(),
   startWorkout: vi.fn(() => Promise.resolve(false)),
   updateWorkout: vi.fn(),
   stopWorkout: vi.fn(),
@@ -25,7 +27,7 @@ import * as native from '../lib/nativeNotifications'
 
 function baseState(overrides = {}) {
   return {
-    settings: { units: 'kg', theme: 'system', restDefault: 90, showRIR: true, notifyRestDone: true, notifyOngoing: true, notifyPR: true, notifyReminders: false, reminderTime: '18:00' },
+    settings: { units: 'kg', theme: 'system', restDefault: 90, showRIR: true, notifyRestDone: true, notifyOngoing: true, notifyPR: true },
     user: { name: 'Athlete' },
     customExercises: [],
     exerciseNotes: {},
@@ -40,6 +42,7 @@ function baseState(overrides = {}) {
     sessions: [],
     measurements: [],
     goals: [],
+    reminders: [],
     activeWorkout: null,
     lastImportedAt: null,
     createdAt: '2026-01-01',
@@ -191,18 +194,42 @@ describe('useWorkoutNotifications — PR celebration (effect C)', () => {
 })
 
 describe('useWorkoutNotifications — reminders (effect D)', () => {
-  it('recomputes when settings.notifyReminders turns on, and stays quiet through unrelated dispatches', () => {
+  it('recomputes on every reminder mutation, and stays quiet through unrelated dispatches', () => {
     const routine = sampleRoutine()
-    const { apply } = renderNotifications(baseState({ routines: [routine], routineOrder: [routine.id] }))
+    const { apply, getState } = renderNotifications(baseState({ routines: [routine], routineOrder: [routine.id] }))
     native.scheduleReminders.mockClear() // drop the initial mount call
 
-    apply({ type: 'SET_SETTINGS', payload: { notifyReminders: true } })
+    apply({ type: 'ADD_REMINDER', payload: { time: '07:30' } })
     expect(native.scheduleReminders).toHaveBeenCalledTimes(1)
+
+    const { id } = getState().reminders[0]
+    apply({ type: 'UPDATE_REMINDER', payload: { id, patch: { enabled: false } } })
+    expect(native.scheduleReminders).toHaveBeenCalledTimes(2)
+
+    apply({ type: 'DELETE_REMINDER', payload: id })
+    expect(native.scheduleReminders).toHaveBeenCalledTimes(3)
 
     native.scheduleReminders.mockClear()
     apply({ type: 'START_WORKOUT', payload: { routineId: routine.id } })
     apply({ type: 'SET_SET_FIELD', payload: { exerciseIndex: 0, setIndex: 0, field: 'weight', value: '60' } })
     expect(native.scheduleReminders).not.toHaveBeenCalled()
+  })
+
+  it('passes the routine mode through, so weekday mode can produce recurring entries', () => {
+    const routine = sampleRoutine()
+    const { apply } = renderNotifications(baseState({
+      routines: [routine],
+      routineOrder: [routine.id],
+      routineMode: 'weekday',
+      weekdayAssignments: { [routine.id]: 4 },
+    }))
+    native.scheduleReminders.mockClear()
+
+    apply({ type: 'ADD_REMINDER', payload: {} })
+
+    const plan = native.scheduleReminders.mock.calls.at(-1)[0]
+    expect(plan).toHaveLength(1)
+    expect(plan[0].on).toEqual({ weekday: 4, hour: 18, minute: 0 })
   })
 })
 
@@ -261,12 +288,14 @@ describe('useWorkoutNotifications — pending action drain (effect E)', () => {
     const routine = sampleRoutine()
     renderNotifications(baseState({ routines: [routine], routineOrder: [routine.id] }))
 
-    expect(CapacitorApp.addListener).toHaveBeenCalledTimes(1)
-    expect(CapacitorApp.addListener).toHaveBeenCalledWith('resume', expect.any(Function))
+    // Effect D (reminders) also registers its own 'resume' listener — this
+    // test isolates effect E's, the one whose handler drains actions.
+    const resumeCalls = CapacitorApp.addListener.mock.calls.filter(([event]) => event === 'resume')
+    expect(resumeCalls).toHaveLength(2)
     expect(native.drainPendingActions).toHaveBeenCalledTimes(1)
 
-    const resumeHandler = CapacitorApp.addListener.mock.calls[0][1]
-    resumeHandler()
+    const drainResumeHandler = resumeCalls[resumeCalls.length - 1][1]
+    drainResumeHandler()
 
     expect(native.drainPendingActions).toHaveBeenCalledTimes(2)
   })
@@ -288,6 +317,46 @@ describe('useWorkoutNotifications — pending action drain (effect E)', () => {
     })
 
     expect(harness.getState().activeWorkout.finishRequested).toBe(true)
+  })
+
+  it('routes a COMPLETE_SET action into TOGGLE_SET_DONE for the first not-done set of the current exercise', async () => {
+    const routine = sampleRoutine()
+    const started = reducer(baseState({ routines: [routine], routineOrder: [routine.id] }), { type: 'START_WORKOUT', payload: { routineId: routine.id } })
+    const workoutId = started.activeWorkout.id
+
+    native.drainPendingActions.mockImplementationOnce(async (apply) => {
+      await Promise.resolve()
+      apply({ workoutId: 'some-other-workout-id', type: 'COMPLETE_SET', payload: 0 })
+      apply({ workoutId, type: 'COMPLETE_SET', payload: 0 })
+    })
+
+    let harness
+    await act(async () => {
+      harness = renderNotifications(started)
+    })
+
+    const unit = harness.getState().activeWorkout.exercises[0]
+    expect(unit.sets[0].done).toBe(true)
+    expect(unit.sets.slice(1).some((s) => s.done)).toBe(false)
+  })
+
+  it('ignores a COMPLETE_SET action once every set in the current exercise is already done', async () => {
+    const routine = sampleRoutine()
+    let started = reducer(baseState({ routines: [routine], routineOrder: [routine.id] }), { type: 'START_WORKOUT', payload: { routineId: routine.id } })
+    started = { ...started, activeWorkout: { ...started.activeWorkout, exercises: started.activeWorkout.exercises.map((e) => ({ ...e, sets: e.sets.map((s) => ({ ...s, done: true })) })) } }
+    const workoutId = started.activeWorkout.id
+
+    native.drainPendingActions.mockImplementationOnce(async (apply) => {
+      await Promise.resolve()
+      apply({ workoutId, type: 'COMPLETE_SET', payload: 0 })
+    })
+
+    let harness
+    await act(async () => {
+      harness = renderNotifications(started)
+    })
+
+    expect(harness.getState().activeWorkout.exercises[0].sets.every((s) => s.done)).toBe(true)
   })
 
   it('applies two same-workout drained actions in order, not just the last one', async () => {

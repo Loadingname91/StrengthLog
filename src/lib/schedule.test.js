@@ -28,8 +28,12 @@ describe('nextUpSince', () => {
     expect(nextUpSince(sessions, null, '2026-01-01')).toBe('2026-01-11')
   })
 
-  it('falls back to the day after createdAt when there are no sessions', () => {
-    expect(nextUpSince([], null, '2026-01-01')).toBe('2026-01-02')
+  it('falls back to createdAt itself when there are no sessions', () => {
+    expect(nextUpSince([], null, '2026-01-01')).toBe('2026-01-01')
+  })
+
+  it('uses a restart anchor later than createdAt when there are no sessions', () => {
+    expect(nextUpSince([], '2026-01-05', '2026-01-01')).toBe('2026-01-05')
   })
 
   it('uses the restart anchor when it is later than the day after the last session', () => {
@@ -45,8 +49,9 @@ describe('nextUpSince', () => {
 
 describe('dueInfo', () => {
   it('is due today when the next occurrence of the assigned weekday is today', () => {
-    // 2026-01-08 is a Thursday (weekday 4).
-    const info = dueInfo('r1', { r1: 4 }, [], null, '2026-01-01', '2026-01-08')
+    // 2026-01-08 is a Thursday (weekday 4). createdAt is a Friday, not day-0
+    // Thursday itself, so this stays a genuine "search forward" case.
+    const info = dueInfo('r1', { r1: 4 }, [], null, '2026-01-02', '2026-01-08')
     expect(info.dueDate).toBe('2026-01-08')
     expect(info.isToday).toBe(true)
     expect(info.isOverdue).toBe(false)
@@ -62,7 +67,8 @@ describe('dueInfo', () => {
 
   it('with no weekday assignment, is due exactly on the since date', () => {
     const info = dueInfo('r1', {}, [], null, '2026-01-01', '2026-01-01')
-    expect(info.dueDate).toBe('2026-01-02')
+    expect(info.dueDate).toBe('2026-01-01')
+    expect(info.isToday).toBe(true)
     expect(info.weekday).toBeNull()
   })
 })

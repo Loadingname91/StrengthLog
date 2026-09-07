@@ -1,6 +1,6 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
-import { REMINDER_ID } from './reminderPlan'
+import { ALL_REMINDER_IDS } from './reminderPlan'
 
 function isNative() {
   return Capacitor.isNativePlatform()
@@ -12,18 +12,21 @@ const WorkoutNotification = registerPlugin('WorkoutNotification')
 
 // Fixed ids so a reschedule always replaces the same notification instead of
 // accumulating duplicates. There's ever at most one rest countdown active,
-// hence a singleton id; REMINDER_ID (imported by reminderPlan's own tests)
-// is the reminder's equivalent.
+// hence a singleton id; reminders (see reminderPlan.js) get a whole range
+// of ids instead, one per weekday plus a one-shot slot, since several can
+// be active at once.
 const REST_DONE_ID = 8001
 const PR_ID = 7001
 
 // @capacitor/local-notifications defaults every schedule() call to
 // isExactNotification: true, which on API 31+ opens the system "Alarms &
-// reminders" settings screen the first time it's needed — a jarring, easy
-// to trigger accidentally surprise for what's meant to be a lightweight
-// rest-timer ping. Explicitly false everywhere: precision for the rest
-// alert is Phase 8's foreground-service timer's job (a wake lock, not an
-// alarm), and a reminder firing within a ten-minute window is fine.
+// reminders" settings screen the first time it's needed — a jarring
+// surprise for what's meant to be a lightweight PR ping, which nobody
+// needs delivered to the minute. Note this belongs on the NOTIFICATION,
+// not inside `schedule`: it used to be spread into the reminder's schedule
+// object, where the plugin ignores it, so reminders silently requested
+// exact alarms (and that settings screen) for every user. Reminders now
+// opt into exactness deliberately — see scheduleReminders below.
 const INEXACT = { isExactNotification: false }
 
 // True once WorkoutNotification.start() has actually been called and
@@ -62,6 +65,21 @@ export async function requestNotificationPermission() {
   if (!isNative()) return 'unsupported'
   const { display } = await LocalNotifications.requestPermissions()
   return display
+}
+
+// The "Alarms & reminders" special access (SCHEDULE_EXACT_ALARM), separate
+// from the notification permission above: without it a reminder still posts,
+// just batched by the OS instead of landing on the minute.
+export async function checkExactAlarmPermission() {
+  if (!isNative()) return 'unsupported'
+  const { exact_alarm } = await LocalNotifications.checkExactNotificationSetting()
+  return exact_alarm
+}
+
+export async function openExactAlarmSettings() {
+  if (!isNative()) return 'unsupported'
+  const { exact_alarm } = await LocalNotifications.changeExactNotificationSetting()
+  return exact_alarm
 }
 
 // Starts the real foreground service (Phase 8) unless the user turned the
@@ -151,21 +169,48 @@ export function notifyPR(payload) {
   })
 }
 
+// Serialized: this runs both from the reminders effect and from a `resume`
+// listener, and every run blanket-cancels the whole id range before
+// scheduling — two overlapping runs would let B's cancel wipe A's freshly
+// scheduled notifications. Callers stay fire-and-forget.
+let reminderQueue = Promise.resolve()
+
 export function scheduleReminders(plan) {
   if (!isNative()) return
-  // buildReminderPlan only ever produces one entry, always at REMINDER_ID —
-  // cancelling that fixed id before rescheduling is what keeps a reschedule
-  // from ever leaking an orphaned notification.
-  LocalNotifications.cancel({ notifications: [{ id: REMINDER_ID }] })
+  reminderQueue = reminderQueue.then(() => applyReminderPlan(plan)).catch(() => {})
+  return reminderQueue
+}
+
+async function applyReminderPlan(plan) {
+  // Cancel the entire range reminders own rather than tracking what was
+  // scheduled last time: it needs no bookkeeping, can't leak an orphan when
+  // a reminder is deleted or its days change, and getPending() is no help
+  // here (it also lists already-fired records).
+  await LocalNotifications.cancel({ notifications: ALL_REMINDER_IDS.map((id) => ({ id })) })
   if (!plan.length) return
-  LocalNotifications.schedule({
+  // Checked, not assumed: scheduling an exact notification without the
+  // permission makes the plugin open the system settings screen mid-call.
+  // Denied just means the OS batches delivery, which is a fine fallback.
+  const isExactNotification = (await checkExactAlarmPermission()) === 'granted'
+  await LocalNotifications.schedule({
     notifications: plan.map((r) => ({
       id: r.id,
       title: r.title,
       body: r.body,
-      schedule: { at: r.at, ...INEXACT },
       channelId: 'fitlog_reminders_v2',
       autoCancel: true,
+      isExactNotification,
+      // `on` is a true weekly recurrence the plugin re-arms itself, so a
+      // standing reminder survives the app being killed, and a reboot.
+      // Caveat: only the first fire gets setExactAndAllowWhileIdle — the
+      // plugin's own re-arm drops to plain setExact, so later occurrences
+      // can be Doze-deferred until the next resume reschedules them.
+      //
+      // The +1 is the plugin's Calendar convention (Sunday = 1); the app is
+      // 0-based Sunday everywhere else. This is the only place they meet.
+      schedule: r.on
+        ? { on: { weekday: r.on.weekday + 1, hour: r.on.hour, minute: r.on.minute }, allowWhileIdle: true }
+        : { at: r.at, allowWhileIdle: true },
     })),
   })
 }

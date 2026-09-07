@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
+import { App as CapacitorApp } from '@capacitor/app'
 import { useStore } from '../state/StoreContext'
 import Card from '../components/Card'
 import SegmentedControl from '../components/SegmentedControl'
 import ConfirmSheet from '../components/ConfirmSheet'
 import { ChevronRightIcon, TrashIcon } from '../components/Icons'
 import { goalProgress } from '../lib/selectors'
-import { checkNotificationPermission, requestNotificationPermission } from '../lib/nativeNotifications'
+import { checkNotificationPermission, requestNotificationPermission, checkExactAlarmPermission, openExactAlarmSettings } from '../lib/nativeNotifications'
 
 const PERMISSION_LABEL = { granted: 'Allowed', denied: 'Blocked', prompt: 'Not asked yet', 'prompt-with-rationale': 'Not asked yet' }
+const EXACT_LABEL = { granted: 'Allowed', denied: 'Off — reminders may fire late' }
 
 function Row({ label, children }) {
   return (
@@ -26,13 +28,30 @@ export default function Settings() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleteGoalTarget, setDeleteGoalTarget] = useState(null)
   const [permission, setPermission] = useState(null)
+  const [exactPermission, setExactPermission] = useState(null)
 
   useEffect(() => {
-    checkNotificationPermission().then(setPermission)
+    function recheck() {
+      checkNotificationPermission().then(setPermission)
+      checkExactAlarmPermission().then(setExactPermission)
+    }
+    recheck()
+    // Both permissions are granted from Android's system Settings app, not an
+    // in-app dialog — granting either there never remounts this screen, so
+    // without a resume recheck the labels stay stuck on stale data until the
+    // user happens to navigate away and back.
+    const resumeSubPromise = CapacitorApp.addListener('resume', recheck)
+    return () => {
+      resumeSubPromise.then((sub) => sub.remove())
+    }
   }, [])
 
   async function requestPermission() {
     setPermission(await requestNotificationPermission())
+  }
+
+  async function fixExactPermission() {
+    setExactPermission(await openExactAlarmSettings())
   }
 
   function set(patch) {
@@ -105,27 +124,32 @@ export default function Settings() {
               <input type="checkbox" checked={state.settings.notifyPR} onChange={(e) => set({ notifyPR: e.target.checked })} className="h-5 w-5" />
             </Row>
             <div className="h-px" style={{ background: 'var(--border)' }} />
-            <Row label="Workout reminders">
-              <input type="checkbox" checked={state.settings.notifyReminders} onChange={(e) => set({ notifyReminders: e.target.checked })} className="h-5 w-5" />
+            <Row label="Exact reminder timing">
+              {exactPermission === 'granted' ? (
+                <span className="text-sm font-semibold" style={{ color: 'var(--accent-dark)' }}>Allowed</span>
+              ) : (
+                <button onClick={fixExactPermission} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ background: 'var(--accent)' }}>
+                  {exactPermission ? EXACT_LABEL[exactPermission] || exactPermission : 'Checking…'} — Fix
+                </button>
+              )}
             </Row>
-            {state.settings.notifyReminders && (
-              <>
-                <div className="h-px" style={{ background: 'var(--border)' }} />
-                <Row label="Reminder time">
-                  <input
-                    type="time"
-                    value={state.settings.reminderTime}
-                    onChange={(e) => set({ reminderTime: e.target.value })}
-                    className="rounded-lg border p-1.5 text-sm"
-                    style={{ borderColor: 'var(--border)' }}
-                  />
-                </Row>
-              </>
-            )}
           </Card>
+          <div className="mt-2">
+            <Card className="!p-0">
+              <NavRow
+                label={`Workout reminders${state.reminders.filter((r) => r.enabled).length > 0 ? ` · ${state.reminders.filter((r) => r.enabled).length} active` : ''}`}
+                onClick={() => navigate('/reminders')}
+              />
+            </Card>
+          </div>
           {state.settings.notifyOngoing && (
             <div className="mt-2 text-[11px]" style={{ color: 'var(--muted)' }}>
               Some phones aggressively kill background apps to save battery. If the ongoing notification disappears mid-workout, check your phone's battery settings (Settings → Apps → FitLog → Battery) and set it to "Unrestricted."
+            </div>
+          )}
+          {state.reminders.some((r) => r.enabled) && (
+            <div className="mt-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+              Reminders may still be delayed by phones that restrict background apps (Samsung's "Put unused apps to sleep" and similar). Setting FitLog's battery mode to "Unrestricted" (Settings → Apps → FitLog → Battery) helps them land on time.
             </div>
           )}
         </div>

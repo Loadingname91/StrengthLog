@@ -61,8 +61,34 @@ describe('buildInitialState', () => {
     expect(state.settings.notifyRestDone).toBe(true) // new key reads as its default, not undefined
     expect(state.settings.notifyOngoing).toBe(true)
     expect(state.settings.notifyPR).toBe(true)
-    expect(state.settings.notifyReminders).toBe(false)
-    expect(state.settings.reminderTime).toBe('18:00')
+    expect(state.reminders).toEqual([]) // no legacy reminder to carry over
+  })
+
+  it('migrates a legacy global reminder into one auto reminder', () => {
+    const persisted = {
+      routines: [],
+      routineOrder: [],
+      sessions: [],
+      customExercises: [],
+      settings: { notifyReminders: true, reminderTime: '07:30' },
+    }
+    localStorage.setItem(KEY, JSON.stringify(persisted))
+
+    const state = buildInitialState()
+
+    expect(state.reminders).toEqual([
+      { id: 'rem-migrated', seq: 0, enabled: true, mode: 'auto', time: '07:30', days: [], label: '' },
+    ])
+  })
+
+  it('leaves an existing reminders array untouched', () => {
+    const reminders = [{ id: 'rem1', seq: 0, enabled: false, mode: 'custom', time: '06:00', days: [1], label: 'Gym' }]
+    localStorage.setItem(KEY, JSON.stringify({
+      routines: [], routineOrder: [], sessions: [], customExercises: [], reminders,
+      settings: { notifyReminders: true, reminderTime: '07:30' },
+    }))
+
+    expect(buildInitialState().reminders).toEqual(reminders)
   })
 
   it('backfills a full settings object for a persisted blob that never had one at all', () => {

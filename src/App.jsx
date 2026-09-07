@@ -19,6 +19,7 @@ import Measurements from './screens/Measurements'
 import CsvImport from './screens/CsvImport'
 import ExportInsights from './screens/ExportInsights'
 import Settings from './screens/Settings'
+import Reminders from './screens/Reminders'
 
 function showNavFor(pathname) {
   if (pathname === '/' || pathname === '/routines' || pathname === '/settings') return true
@@ -84,6 +85,7 @@ function Shell() {
             <Route path="/csv-import" element={<CsvImport />} />
             <Route path="/export" element={<ExportInsights />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/reminders" element={<Reminders />} />
           </Routes>
         </ErrorBoundary>
       </div>

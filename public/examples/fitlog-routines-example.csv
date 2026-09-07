@@ -1,0 +1,6 @@
+Routine name,Superset group,Exercise name,Sets,Rep min,Rep max,Rest (sec),RIR,Target weight,Primary muscle,Secondary muscle,Equipment
+Push Day,,Bench Press,3,8,12,90,2,,,,
+Push Day,A,Incline Dumbbell Press,3,8,12,60,2,,,,
+Push Day,A,Cable Fly,3,10,15,60,2,,,,
+Push Day,,Landmine Press,3,8,12,90,2,,Shoulders,Triceps,Barbell
+Pull Day,,Barbell Row,4,6,10,90,1,,,,

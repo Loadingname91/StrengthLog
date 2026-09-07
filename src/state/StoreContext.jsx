@@ -13,6 +13,15 @@ export function buildInitialState() {
     // Backfill fields added after this state was first saved.
     if (!persisted.weekdayAssignments) persisted.weekdayAssignments = defaultWeekdayAssignments(persisted.routineOrder)
     if (persisted.scheduleRestartAt === undefined) persisted.scheduleRestartAt = null
+    if (!persisted.reminders) {
+      // Carries the old single global reminder over as one auto reminder, so
+      // an upgrading user's reminder doesn't silently vanish. A fixed id (not
+      // uid) keeps the migration deterministic. Runs once — afterwards the
+      // legacy settings keys have no reader left.
+      persisted.reminders = persisted.settings?.notifyReminders
+        ? [{ id: 'rem-migrated', seq: 0, enabled: true, mode: 'auto', time: persisted.settings.reminderTime || '18:00', days: [], label: '' }]
+        : []
+    }
     // Defaults first, persisted second — so any settings key added after a
     // user's first save (e.g. notification prefs) reads as its default
     // instead of undefined, without a one-off backfill line per key.
@@ -35,6 +44,7 @@ export function buildInitialState() {
     sessions: [],
     measurements: [],
     goals: [],
+    reminders: [],
     activeWorkout: null,
     lastImportedAt: null,
     createdAt: todayISO(),
