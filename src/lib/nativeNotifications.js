@@ -37,9 +37,19 @@ let serviceActive = false
 
 export async function ensureChannels() {
   if (!isNative()) return
+  // fitlog_rest_v1 is deliberately untouched — postRestDoneAlert() always
+  // posts with setSilent(true) (WorkoutService.kt), so this channel's own
+  // sound is never actually used; the rest-done ding plays via its own
+  // MediaPlayer instead (see playDuckedDing()'s bundled fitlog_chime asset).
   await LocalNotifications.createChannel({ id: 'fitlog_rest_v1', name: 'Rest timer', importance: 4, visibility: 1, vibration: true })
-  await LocalNotifications.createChannel({ id: 'fitlog_reminders_v1', name: 'Workout reminders', importance: 3, visibility: 1 })
-  await LocalNotifications.createChannel({ id: 'fitlog_pr_v1', name: 'Personal records', importance: 3, visibility: 1 })
+  // _v2: channels are immutable after first creation, so a device that
+  // already made _v1 silently (no sound/vibration field was ever passed)
+  // can never be fixed in place — only a new channel id takes the new
+  // config. fitlog_chime is a bundled asset (res/raw/), not the system
+  // default sound, so this doesn't depend on the phone's own default
+  // notification sound being audible.
+  await LocalNotifications.createChannel({ id: 'fitlog_reminders_v2', name: 'Workout reminders', importance: 3, visibility: 1, sound: 'fitlog_chime', vibration: true })
+  await LocalNotifications.createChannel({ id: 'fitlog_pr_v2', name: 'Personal records', importance: 3, visibility: 1, sound: 'fitlog_chime', vibration: true })
 }
 
 export async function checkNotificationPermission() {
@@ -134,7 +144,7 @@ export function notifyPR(payload) {
       id: PR_ID,
       title: 'New PR! 🏆',
       body: payload.exerciseName ? `${payload.exerciseName} — nice work!` : 'Nice work.',
-      channelId: 'fitlog_pr_v1',
+      channelId: 'fitlog_pr_v2',
       autoCancel: true,
       ...INEXACT,
     }],
@@ -154,7 +164,7 @@ export function scheduleReminders(plan) {
       title: r.title,
       body: r.body,
       schedule: { at: r.at, ...INEXACT },
-      channelId: 'fitlog_reminders_v1',
+      channelId: 'fitlog_reminders_v2',
       autoCancel: true,
     })),
   })
