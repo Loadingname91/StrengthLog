@@ -108,6 +108,7 @@ Still unverified regardless of the above: the manifest/foreground-service-type p
 
 Carried-forward notes from v1.0/v1.1:
 
+- The main checkout (not this worktree) has substantial **uncommitted** work reworking reminders into a multi-reminder, weekday-based system — `Settings.jsx` references `state.reminders` and navigates to a `/reminders` route, but neither the reducer's `initialSettings()`/`buildInitialState()` nor `App.jsx`'s route table have been updated to match, so it would break if exercised as-is. Discovered 2026-09-07 while scoping the `audio-notifications` quick task, which deliberately doesn't touch or depend on it. Worth finishing or reverting before it's lost.
 - `schedule.js`/`csvImport.js`/`selectors.js` test-coverage gap (v1.0-era note) is closed — see `CONCERNS.md`'s Tech Debt / Fragile Areas sections.
 - On-device UAT for v1.0 Phases 1-3 was upgraded to browser-verified (20/20 Playwright checks passed) but the full ~40+ control sweep and Android-native-only behaviors (haptics, hardware back button) remain genuinely device-only and unverified. v1.1 Phases 5-6 got the same treatment: real-browser Playwright checks for both (5/5 and 10/10 passed respectively, including a full single-exercise + superset workout logged end-to-end), with the same Android-native-only caveat.
 - Still open, deliberately not addressed (see `CONCERNS.md`): `reducer.js`/large-screen splitting, Prettier adoption, debounced saves, `localStorage`→IndexedDB migration, full corrupted-data recovery UI. None are regressions — pre-existing or newly-noted scaling/maintainability items for a future milestone, not blocking.
@@ -118,6 +119,7 @@ Carried-forward notes from v1.0/v1.1:
 | Date | Task | Slug | Status |
 |------|------|------|--------|
 | 2026-09-07 | Resume CTA labels + set-done checkmark glow | `resume-cta-labels-and-set-done-checkmark` | complete ✓ |
+| 2026-09-07 | Audio for reminders, PR, and rest-done notifications (bundled chime, replaces system-default-sound dependency) | `audio-notifications` | complete — pending device verification |
 
 ## Deferred Items
 
