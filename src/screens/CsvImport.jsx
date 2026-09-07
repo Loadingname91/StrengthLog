@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../state/StoreContext'
+import { useToast } from '../state/ToastContext'
 import SegmentedControl from '../components/SegmentedControl'
-import { BackIcon, UploadIcon, DownloadIcon } from '../components/Icons'
+import { BackIcon, UploadIcon, DownloadIcon, CopyIcon } from '../components/Icons'
 import { parseCSV, guessMapping, guessRoutineMapping, IMPORT_FIELDS, ROUTINE_IMPORT_FIELDS, downloadTextFile } from '../lib/csv'
 import { buildCandidates, detectUnit, finalizeImport } from '../lib/csvImport'
 import { buildRoutineCandidates, finalizeRoutineImport } from '../lib/routineCsvImport'
@@ -31,6 +32,7 @@ Pull Day,,Barbell Row,4,6,10,90,1,,,,
 export default function CsvImport() {
   const { state, dispatch } = useStore()
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const fileInputRef = useRef(null)
 
   const [mode, setMode] = useState('workouts') // 'workouts' | 'routines'
@@ -85,6 +87,12 @@ export default function CsvImport() {
   function downloadExample() {
     if (mode === 'routines') downloadTextFile('fitlog-routines-example.csv', 'text/csv', SAMPLE_ROUTINE_CSV)
     else downloadTextFile('fitlog-workouts-example.csv', 'text/csv', SAMPLE_CSV)
+  }
+
+  async function copyExample() {
+    const text = mode === 'routines' ? SAMPLE_ROUTINE_CSV : SAMPLE_CSV
+    await navigator.clipboard.writeText(text)
+    showToast('Example CSV copied')
   }
 
   function goPreview() {
@@ -165,15 +173,24 @@ export default function CsvImport() {
           >
             Use sample {mode === 'routines' ? 'routines' : 'export'}.csv
           </button>
-          <button
-            onClick={downloadExample}
-            className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-2xl border py-3 text-[13px] font-semibold"
-            style={{ borderColor: 'var(--border)' }}
-          >
-            <DownloadIcon size={15} /> Download example CSV
-          </button>
+          <div className="mt-2.5 flex gap-2.5">
+            <button
+              onClick={copyExample}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border py-3 text-[13px] font-semibold"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <CopyIcon size={15} /> Copy fields
+            </button>
+            <button
+              onClick={downloadExample}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border py-3 text-[13px] font-semibold"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <DownloadIcon size={15} /> Download .csv
+            </button>
+          </div>
           <div className="mt-2 text-[11px]" style={{ color: 'var(--muted)' }}>
-            Handy for feeding the exact expected format to an LLM before generating your own file.
+            Copy pastes the example straight to your clipboard to edit or hand to an LLM; download saves it as a file.
           </div>
         </div>
       )}
