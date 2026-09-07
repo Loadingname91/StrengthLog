@@ -7,10 +7,10 @@ import SegmentedControl from '../components/SegmentedControl'
 import LineChart from '../components/LineChart'
 import BodyHeatmap from '../components/BodyHeatmap'
 import CalendarHeatmap from '../components/CalendarHeatmap'
-import { CalendarIcon } from '../components/Icons'
+import { ChevronRightIcon } from '../components/Icons'
 import {
   goalProgress, chartSeries, muscleSetCounts, sessionsSince, exerciseSetCounts,
-  dayTallies, weekStreak, trailingComparison, recentPRs,
+  dayTallies, weekStreak, trailingComparison, recentPRs, recentSessions, totalSets,
 } from '../lib/selectors'
 import { regionIntensities } from '../lib/muscles'
 import { daysAgo, fmtDate, workoutCtaLabel } from '../lib/format'
@@ -47,6 +47,7 @@ export default function Home() {
   const streak = useMemo(() => weekStreak(state.sessions), [state.sessions])
   const thisWeek = useMemo(() => trailingComparison(state.sessions), [state.sessions])
   const prs = useMemo(() => recentPRs(state.sessions, 4), [state.sessions])
+  const mostRecent = useMemo(() => recentSessions(state.sessions, 1)[0], [state.sessions])
 
   const hasHistory = state.sessions.length > 0
 
@@ -70,13 +71,6 @@ export default function Home() {
             <div className="font-serif text-[19px] font-semibold whitespace-nowrap">{state.user.name}</div>
           </div>
         </div>
-        <button
-          onClick={() => navigate('/stats/log')}
-          className="flex h-[38px] w-[38px] items-center justify-center rounded-full border"
-          style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
-        >
-          <CalendarIcon size={18} />
-        </button>
       </div>
 
       {nextRoutine && (
@@ -170,6 +164,10 @@ export default function Home() {
         </div>
       ) : (
         <>
+          <div className="px-5 pt-6">
+            <RecentWorkoutsCard session={mostRecent} totalCount={state.sessions.length} onClick={() => navigate('/stats/log')} />
+          </div>
+
           <div className="px-5 pt-6">
             <div className="font-serif mb-2.5 text-base font-semibold">This week</div>
             <Card>
@@ -307,6 +305,33 @@ function WeekStat({ label, value, pct }) {
           {up ? '+' : ''}{pct}%
         </div>
       )}
+    </div>
+  )
+}
+
+// Two offset, faded bordered layers behind the real Card read as a peeking
+// stack of past workouts (pure CSS, no library) — the primary, discoverable
+// entry point into workout history, replacing the old header calendar icon.
+function RecentWorkoutsCard({ session, totalCount, onClick }) {
+  return (
+    <div className="relative cursor-pointer pb-2 pr-2" onClick={onClick}>
+      <div className="absolute inset-0 translate-x-2 translate-y-2 rounded-[20px] border" style={{ background: 'var(--surface-alt)', borderColor: 'var(--border)', opacity: 0.5 }} />
+      <div className="absolute inset-0 translate-x-1 translate-y-1 rounded-[20px] border" style={{ background: 'var(--surface)', borderColor: 'var(--border)', opacity: 0.8 }} />
+      <Card className="relative">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--accent)' }}>Recent workout</div>
+            <div className="font-serif mt-1 truncate text-[17px] font-semibold">{session.routineName}</div>
+            <div className="mt-0.5 text-[13px]" style={{ color: 'var(--muted)' }}>
+              {fmtDate(session.date)} · {totalSets(session)} sets · {session.volume}kg
+            </div>
+          </div>
+          <ChevronRightIcon size={18} style={{ color: 'var(--muted)' }} />
+        </div>
+        <div className="mt-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+          {totalCount} workout{totalCount === 1 ? '' : 's'} logged · tap to see full history
+        </div>
+      </Card>
     </div>
   )
 }
