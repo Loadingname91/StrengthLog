@@ -10,6 +10,11 @@ export function fmtDateLong(iso) {
   return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
 }
 
+export function fmtMonthYear(iso) {
+  const d = new Date(iso)
+  return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+}
+
 export function fmtElapsed(seconds) {
   const s = Math.max(0, Math.floor(seconds))
   const m = Math.floor(s / 60)

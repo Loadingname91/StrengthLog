@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   bestProductForExercise, recomputePRFlags, totalVolume, totalReps, totalSets, muscleSetCounts, exerciseSetCounts,
-  recentPRs, dayTallies, weekStreak, exerciseProgress, epley1RM,
+  recentPRs, recentSessions, dayTallies, weekStreak, exerciseProgress, epley1RM,
 } from './selectors'
 import { localISODate } from './format'
 
@@ -138,6 +138,26 @@ describe('recentPRs', () => {
       session({ entries: [{ exerciseId: 'bench-press', sets: [{ weight: 60, reps: 8, isPR: false }, { weight: 60, reps: 8 }] }] }),
     ]
     expect(recentPRs(sessions)).toEqual([])
+  })
+})
+
+describe('recentSessions', () => {
+  it('returns the newest n sessions in date-descending order', () => {
+    const sessions = [
+      session({ id: 'a', date: '2026-01-01' }),
+      session({ id: 'c', date: '2026-01-15' }),
+      session({ id: 'b', date: '2026-01-08' }),
+    ]
+    expect(recentSessions(sessions, 2).map((s) => s.id)).toEqual(['c', 'b'])
+  })
+
+  it('defaults to the single most recent session', () => {
+    const sessions = [session({ id: 'a', date: '2026-01-01' }), session({ id: 'b', date: '2026-01-08' })]
+    expect(recentSessions(sessions).map((s) => s.id)).toEqual(['b'])
+  })
+
+  it('returns an empty array for an empty session list', () => {
+    expect(recentSessions([])).toEqual([])
   })
 })
 

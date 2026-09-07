@@ -204,6 +204,13 @@ export function recentPRs(sessions, limit = 5) {
   return prs.sort((a, b) => b.date.localeCompare(a.date)).slice(0, limit)
 }
 
+// Sessions newest-first, capped at n. StatsHub's LogTab still keeps its own
+// full sort (it needs every session for month-grouping) — this is for
+// call sites that only need "the last few," like Home's recent-workout card.
+export function recentSessions(sessions, n = 1) {
+  return [...sessions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, n)
+}
+
 // Per-day tallies for the consistency calendar: date -> { count, volume }.
 export function dayTallies(sessions) {
   const out = {}

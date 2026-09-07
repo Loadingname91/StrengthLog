@@ -8,7 +8,7 @@ import BodyHeatmap from '../components/BodyHeatmap'
 import { ChevronRightIcon } from '../components/Icons'
 import { exerciseById } from '../lib/exercises'
 import { musclesForRegion, regionIntensities } from '../lib/muscles'
-import { daysAgo, fmtDate, round1 } from '../lib/format'
+import { daysAgo, fmtDate, fmtMonthYear, round1, todayISO } from '../lib/format'
 import {
   sessionsSince, muscleSetCounts, exerciseSetCounts, chartSeries,
   totalSets, totalReps, totalVolume,
@@ -223,9 +223,31 @@ function LogTab() {
   const { state } = useStore()
   const navigate = useNavigate()
   const [routineFilter, setRoutineFilter] = useState('all')
+  const [expandedMonths, setExpandedMonths] = useState(() => new Set([todayISO().slice(0, 7)]))
 
   const sorted = useMemo(() => [...state.sessions].sort((a, b) => b.date.localeCompare(a.date)), [state.sessions])
   const filtered = routineFilter === 'all' ? sorted : sorted.filter((s) => s.routineId === routineFilter)
+
+  // Newest-first because `filtered` already is — Map preserves insertion
+  // order, so no separate sort of the group keys is needed.
+  const groups = useMemo(() => {
+    const map = new Map()
+    for (const session of filtered) {
+      const key = session.date.slice(0, 7)
+      if (!map.has(key)) map.set(key, [])
+      map.get(key).push(session)
+    }
+    return [...map.entries()]
+  }, [filtered])
+
+  function toggleMonth(key) {
+    setExpandedMonths((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   return (
     <div className="flex flex-col gap-3 px-5">
@@ -239,22 +261,40 @@ function LogTab() {
         {state.routines.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
       </select>
 
-      <div className="flex flex-col gap-2">
-        {filtered.map((session) => (
-          <div
-            key={session.id}
-            onClick={() => navigate(`/session/${session.id}`)}
-            className="flex cursor-pointer items-center justify-between rounded-2xl border p-3.5"
-            style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
-          >
-            <div>
-              <div className="text-sm font-semibold">{session.routineName}</div>
-              <div className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>{fmtDate(session.date)} · {totalSets(session)} sets · {session.volume}kg</div>
+      <div className="flex flex-col gap-3">
+        {groups.map(([key, sessions]) => {
+          const expanded = expandedMonths.has(key)
+          return (
+            <div key={key}>
+              <button onClick={() => toggleMonth(key)} className="flex w-full items-center justify-between py-1.5 text-left">
+                <span className="text-[13px] font-semibold">{fmtMonthYear(`${key}-01`)}</span>
+                <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--muted)' }}>
+                  {sessions.length} workout{sessions.length === 1 ? '' : 's'}
+                  <ChevronRightIcon size={14} style={{ transform: expanded ? 'rotate(90deg)' : 'none' }} />
+                </span>
+              </button>
+              {expanded && (
+                <div className="flex flex-col gap-2 pt-1">
+                  {sessions.map((session) => (
+                    <div
+                      key={session.id}
+                      onClick={() => navigate(`/session/${session.id}`)}
+                      className="flex cursor-pointer items-center justify-between rounded-2xl border p-3.5"
+                      style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+                    >
+                      <div>
+                        <div className="text-sm font-semibold">{session.routineName}</div>
+                        <div className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>{fmtDate(session.date)} · {totalSets(session)} sets · {session.volume}kg</div>
+                      </div>
+                      <ChevronRightIcon size={16} style={{ color: 'var(--muted)' }} />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <ChevronRightIcon size={16} style={{ color: 'var(--muted)' }} />
-          </div>
-        ))}
-        {!filtered.length && <div className="py-8 text-center text-sm" style={{ color: 'var(--muted)' }}>No workouts logged yet.</div>}
+          )
+        })}
+        {!groups.length && <div className="py-8 text-center text-sm" style={{ color: 'var(--muted)' }}>No workouts logged yet.</div>}
       </div>
     </div>
   )
