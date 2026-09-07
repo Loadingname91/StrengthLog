@@ -52,7 +52,7 @@ export function useWorkoutNotifications(state, dispatch, exercises) {
     : null
   const lastPRName = lastPRExId ? exerciseById(lastPRExId, exercises)?.name ?? null : null
 
-  const { notifyRestDone, notifyPR: notifyPREnabled, notifyReminders, reminderTime } = state.settings
+  const { notifyRestDone, notifyPR: notifyPREnabled } = state.settings
 
   // Seeded from the current value, not null: lastPR is never cleared for the
   // life of a workout (it just carries forward on every TOGGLE_SET_DONE), so
@@ -114,21 +114,35 @@ export function useWorkoutNotifications(state, dispatch, exercises) {
   // (SET_SET_FIELD/TOGGLE_SET_DONE/REST_* only ever touch activeWorkout), so
   // this stays quiet while a workout is being logged and only recomputes on
   // an actual schedule-relevant change: a session finishing, a schedule
-  // edit, or the reminder setting itself changing.
-  const { routineOrder, sequenceIndex, routines, weekdayAssignments, sessions, scheduleRestartAt, createdAt } = state
+  // edit, or a reminder being added/edited/removed.
+  const { reminders, routineMode, routineOrder, sequenceIndex, routines, weekdayAssignments, sessions, scheduleRestartAt, createdAt } = state
   useEffect(() => {
-    const plan = buildReminderPlan({
-      settings: { notifyReminders, reminderTime },
-      routineOrder,
-      sequenceIndex,
-      routines,
-      weekdayAssignments,
-      sessions,
-      scheduleRestartAt,
-      createdAt,
-    })
-    native.scheduleReminders(plan)
-  }, [notifyReminders, reminderTime, routineOrder, sequenceIndex, routines, weekdayAssignments, sessions, scheduleRestartAt, createdAt])
+    function schedule() {
+      const plan = buildReminderPlan({
+        reminders,
+        routineMode,
+        routineOrder,
+        sequenceIndex,
+        routines,
+        weekdayAssignments,
+        sessions,
+        scheduleRestartAt,
+        createdAt,
+      })
+      native.scheduleReminders(plan)
+    }
+    schedule()
+    // Reminders scheduled while a permission was still denied never post, and
+    // none of the deps above change just because the user later flips that
+    // permission on in Android's system Settings — so without this, a lost
+    // reminder stays lost. Resume is the only signal that they might have
+    // just fixed it; it also refreshes exactness on standing recurrences,
+    // whose later occurrences the plugin re-arms without the wake flags.
+    const resumeSubPromise = CapacitorApp.addListener('resume', schedule)
+    return () => {
+      resumeSubPromise.then((sub) => sub.remove())
+    }
+  }, [reminders, routineMode, routineOrder, sequenceIndex, routines, weekdayAssignments, sessions, scheduleRestartAt, createdAt])
 
   // E — pending native action drain. A Skip/+15s/Finish tap applied to the
   // notification while the app was backgrounded or killed reaches the
@@ -146,10 +160,16 @@ export function useWorkoutNotifications(state, dispatch, exercises) {
   // effect layer's.
   useEffect(() => {
     function apply(a) {
-      if (a.workoutId !== stateRef.current.activeWorkout?.id) return
+      const currentAw = stateRef.current.activeWorkout
+      if (a.workoutId !== currentAw?.id) return
       if (a.type === 'REST_SKIP') dispatch({ type: 'REST_SKIP' })
       else if (a.type === 'REST_ADJUST') dispatch({ type: 'REST_ADJUST', payload: a.payload })
       else if (a.type === 'FINISH_TAPPED') dispatch({ type: 'SET_FINISH_REQUESTED', payload: true })
+      else if (a.type === 'COMPLETE_SET') {
+        const unit = currentAw.exercises[currentAw.currentIndex]
+        const setIndex = unit ? unit.sets.findIndex((s) => !s.done) : -1
+        if (setIndex !== -1) dispatch({ type: 'TOGGLE_SET_DONE', payload: { exerciseIndex: currentAw.currentIndex, setIndex } })
+      }
     }
     native.drainPendingActions(apply)
     const resumeSubPromise = CapacitorApp.addListener('resume', () => native.drainPendingActions(apply))

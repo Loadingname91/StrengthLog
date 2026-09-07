@@ -42,6 +42,7 @@ class WorkoutService : Service() {
         const val ACTION_SKIP_REST = "com.fitlog.app.notifications.ACTION_SKIP_REST"
         const val ACTION_ADD_15S = "com.fitlog.app.notifications.ACTION_ADD_15S"
         const val ACTION_FINISH_TAPPED = "com.fitlog.app.notifications.ACTION_FINISH_TAPPED"
+        const val ACTION_COMPLETE_SET = "com.fitlog.app.notifications.ACTION_COMPLETE_SET"
 
         const val EXTRA_WORKOUT_ID = "workoutId"
         const val EXTRA_EXERCISE_NAME = "exerciseName"
@@ -116,6 +117,7 @@ class WorkoutService : Service() {
             ACTION_SKIP_REST -> handleSkipRest()
             ACTION_ADD_15S -> handleAdd15s()
             ACTION_FINISH_TAPPED -> handleFinishTapped()
+            ACTION_COMPLETE_SET -> handleCompleteSet()
             else -> rescheduleRestAlarmIfNeeded()
         }
 
@@ -190,6 +192,10 @@ class WorkoutService : Service() {
                 .setUsesChronometer(true)
                 .setChronometerCountDown(false)
                 .setWhen(startedAt)
+                // Primary action: marks the current set done (with whatever
+                // weight/reps are already filled in) without opening the app
+                // or the in-app Finish confirmation — see handleCompleteSet().
+                .addAction(R.drawable.ic_stat_workout, "Complete set", pendingIntentForAction(ACTION_COMPLETE_SET, 4))
                 // Routes through the service (not a direct openAppPendingIntent)
                 // so the tap is durably recorded via the same pending-action
                 // pipeline as Skip/+15s — see handleFinishTapped().
@@ -361,6 +367,17 @@ class WorkoutService : Service() {
         armRestAlarm(restUntil - now, restUntil)
         enqueueAndEmit("REST_ADJUST", 15)
         postOngoingNotification()
+    }
+
+    // No local state mutation (unlike Skip/+15s): this service tracks
+    // setsDone/setsTotal for the *current* exercise but not per-set
+    // weight/reps or the block's configured rest-after value, so the actual
+    // set-completion and rest-timer-start stay entirely the reducer's job
+    // (TOGGLE_SET_DONE) rather than duplicating that logic here. The
+    // notification's content catches up once the JS side applies it (the
+    // live listener while the WebView is alive, or the resume drain).
+    private fun handleCompleteSet() {
+        enqueueAndEmit("COMPLETE_SET", 0)
     }
 
     private fun handleFinishTapped() {

@@ -57,10 +57,12 @@ function nextOccurrence(sinceISO, targetWeekday) {
 // calculated: the day after the last finished session, or the restart
 // anchor if one was set and is more recent.
 export function nextUpSince(sessions, scheduleRestartAt, createdAt) {
-  const lastDate = sessions.length ? [...sessions].sort((a, b) => a.date.localeCompare(b.date)).at(-1).date : createdAt
+  if (!sessions.length) {
+    return scheduleRestartAt && scheduleRestartAt > createdAt ? scheduleRestartAt : createdAt
+  }
+  const lastDate = [...sessions].sort((a, b) => a.date.localeCompare(b.date)).at(-1).date
   const afterLast = addDays(lastDate, 1)
-  if (scheduleRestartAt && scheduleRestartAt > afterLast) return scheduleRestartAt
-  return afterLast
+  return scheduleRestartAt && scheduleRestartAt > afterLast ? scheduleRestartAt : afterLast
 }
 
 export function dueInfo(routineId, weekdayAssignments, sessions, scheduleRestartAt, createdAt, today = todayISODate()) {
