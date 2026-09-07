@@ -157,7 +157,20 @@ export default function CsvImport() {
           <div className="mb-4 flex justify-center">
             <SegmentedControl value={mode} onChange={switchMode} options={[{ value: 'workouts', label: 'Workouts' }, { value: 'routines', label: 'Routines' }]} />
           </div>
-          <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={onFile} />
+          {/* Android's document picker filters by MIME type, not extension - a
+            real CSV can be tagged text/csv, text/comma-separated-values,
+            application/vnd.ms-excel, or fall back to text/plain depending
+            on which app wrote it, and a bare ".csv" accept greys out any
+            file whose tag doesn't match. Listing every common variant
+            (plus the extension, for browsers that do match on it) keeps a
+            genuinely valid CSV selectable regardless of its MIME tag. */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv,text/comma-separated-values,application/csv,application/vnd.ms-excel,text/plain"
+            className="hidden"
+            onChange={onFile}
+          />
           <div
             onClick={() => fileInputRef.current?.click()}
             className="cursor-pointer rounded-[18px] border-2 border-dashed p-10 text-[13px]"
