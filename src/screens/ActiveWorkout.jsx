@@ -476,6 +476,13 @@ function SetRow({
           background: set.done ? 'var(--accent)' : 'transparent',
           borderColor: set.done ? 'var(--accent)' : 'var(--border)',
           color: '#fff',
+          // Filled alone, the circle reads as a flat dark disc against the dark
+          // theme's --bg. A white ring plus a soft outer glow separates it from
+          // the surface so "done" is legible at a glance mid-set.
+          boxShadow: set.done
+            ? '0 0 0 2px rgba(255,255,255,0.55), 0 0 12px 2px rgba(255,255,255,0.28)'
+            : 'none',
+          transition: 'box-shadow 180ms ease-out',
         }}
       >
         {set.done && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 13l4 4L19 7" /></svg>}

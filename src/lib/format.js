@@ -69,3 +69,14 @@ export function blockTarget(block) {
   return `${sets}×${block.repMin}-${block.repMax}`
 }
 
+// Every "Start Workout" button resumes the in-progress session instead of
+// starting a new one (Home.jsx, WorkoutOverview.jsx), so the label has to say
+// so — otherwise the button contradicts the SessionBar sitting right below it.
+// The third case is named rather than a bare "Resume Workout": the tap leaves
+// for a different routine's session than the one whose page you're looking at.
+export function workoutCtaLabel(activeWorkout, routineId) {
+  if (!activeWorkout) return 'Start Workout'
+  if (activeWorkout.routineId === routineId) return 'Resume Workout'
+  return `Resume ${activeWorkout.routineName}`
+}
+
