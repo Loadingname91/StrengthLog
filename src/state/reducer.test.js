@@ -135,6 +135,100 @@ describe('FINISH_WORKOUT', () => {
   })
 })
 
+function sessionWithSet(id, date, exerciseId, weight, reps) {
+  return {
+    id,
+    routineId: 'r1',
+    routineName: 'Push Day',
+    date,
+    startedAt: `${date}T10:00:00.000Z`,
+    finishedAt: `${date}T10:30:00.000Z`,
+    durationSec: 1800,
+    note: '',
+    entries: [{ exerciseId, blockId: 'block1', sets: [{ weight, reps, rir: 2, isPR: weight * reps > 0 }] }],
+    volume: weight * reps,
+    prCount: 0,
+  }
+}
+
+describe('DELETE_SESSION', () => {
+  it('removes the session and clears lastFinishedSession only on a matching id', () => {
+    const s1 = sessionWithSet('s1', '2026-01-01', 'bench-press', 60, 10)
+    const s2 = sessionWithSet('s2', '2026-01-02', 'bench-press', 40, 10)
+    const state = baseState({ sessions: [s1, s2], lastFinishedSession: s1 })
+
+    const next = reducer(state, { type: 'DELETE_SESSION', payload: 's1' })
+
+    expect(next.sessions.map((s) => s.id)).toEqual(['s2'])
+    expect(next.lastFinishedSession).toBeNull()
+  })
+
+  it('leaves lastFinishedSession untouched when the deleted session is not it', () => {
+    const s1 = sessionWithSet('s1', '2026-01-01', 'bench-press', 60, 10)
+    const s2 = sessionWithSet('s2', '2026-01-02', 'bench-press', 40, 10)
+    const state = baseState({ sessions: [s1, s2], lastFinishedSession: s2 })
+
+    const next = reducer(state, { type: 'DELETE_SESSION', payload: 's1' })
+
+    expect(next.lastFinishedSession).toBe(s2)
+  })
+
+  it('is a no-op (aside from PR recompute) when the id is unknown', () => {
+    const s1 = sessionWithSet('s1', '2026-01-01', 'bench-press', 60, 10)
+    const state = baseState({ sessions: [s1] })
+
+    const next = reducer(state, { type: 'DELETE_SESSION', payload: 'nope' })
+
+    expect(next.sessions).toHaveLength(1)
+    expect(next.sessions[0].id).toBe('s1')
+  })
+
+  it('recomputes PR flags across the remaining sessions after deleting an earlier one', () => {
+    // s1 (earliest, biggest lift) is the PR; s2 loses to it. Deleting s1
+    // should promote s2's set to a PR.
+    const s1 = sessionWithSet('s1', '2026-01-01', 'bench-press', 100, 5)
+    const s2 = sessionWithSet('s2', '2026-01-02', 'bench-press', 60, 10)
+    s1.entries[0].sets[0].isPR = true
+    s1.prCount = 1
+    s2.entries[0].sets[0].isPR = false
+    s2.prCount = 0
+    const state = baseState({ sessions: [s1, s2] })
+
+    const next = reducer(state, { type: 'DELETE_SESSION', payload: 's1' })
+
+    expect(next.sessions).toHaveLength(1)
+    expect(next.sessions[0].entries[0].sets[0].isPR).toBe(true)
+    expect(next.sessions[0].prCount).toBe(1)
+  })
+})
+
+describe('RESTART_WORKOUT', () => {
+  it('rebuilds the active workout from its routine with every set blank', () => {
+    const routine = sampleRoutine()
+    const started = reducer(baseState({ routines: [routine], routineOrder: [routine.id] }), { type: 'START_WORKOUT', payload: { routineId: routine.id } })
+    const logged = reducer(started, { type: 'SET_SET_FIELD', payload: { exerciseIndex: 0, setIndex: 0, field: 'weight', value: '60' } })
+
+    const restarted = reducer(logged, { type: 'RESTART_WORKOUT' })
+
+    expect(restarted.activeWorkout).not.toBeNull()
+    expect(restarted.activeWorkout.id).not.toBe(logged.activeWorkout.id)
+    expect(restarted.activeWorkout.exercises[0].sets.every((s) => s.weight === '' && !s.done)).toBe(true)
+  })
+
+  it('is a no-op when there is no active workout', () => {
+    const state = baseState()
+    const next = reducer(state, { type: 'RESTART_WORKOUT' })
+    expect(next).toBe(state)
+  })
+
+  it('is a no-op when the active workout\'s routine no longer exists', () => {
+    const activeWorkout = { id: 'w1', routineId: 'deleted-routine', exercises: [] }
+    const state = baseState({ activeWorkout })
+    const next = reducer(state, { type: 'RESTART_WORKOUT' })
+    expect(next).toBe(state)
+  })
+})
+
 function supersetRoutine() {
   return {
     id: 'r1',

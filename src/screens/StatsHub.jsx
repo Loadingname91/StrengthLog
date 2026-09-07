@@ -220,10 +220,9 @@ function MusclesTab() {
 }
 
 function LogTab() {
-  const { state, exercises } = useStore()
+  const { state } = useStore()
   const navigate = useNavigate()
   const [routineFilter, setRoutineFilter] = useState('all')
-  const [openId, setOpenId] = useState(null)
 
   const sorted = useMemo(() => [...state.sessions].sort((a, b) => b.date.localeCompare(a.date)), [state.sessions])
   const filtered = routineFilter === 'all' ? sorted : sorted.filter((s) => s.routineId === routineFilter)
@@ -241,31 +240,20 @@ function LogTab() {
       </select>
 
       <div className="flex flex-col gap-2">
-        {filtered.map((session) => {
-          const open = openId === session.id
-          return (
-            <div key={session.id} className="rounded-2xl border" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-              <div onClick={() => setOpenId(open ? null : session.id)} className="flex cursor-pointer items-center justify-between p-3.5">
-                <div>
-                  <div className="text-sm font-semibold">{session.routineName}</div>
-                  <div className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>{fmtDate(session.date)} · {totalSets(session)} sets · {session.volume}kg</div>
-                </div>
-                <ChevronRightIcon size={16} style={{ color: 'var(--muted)', transform: open ? 'rotate(90deg)' : 'none' }} />
-              </div>
-              {open && (
-                <div className="flex flex-col gap-1.5 border-t px-3.5 pb-3.5 pt-2.5" style={{ borderColor: 'var(--border)' }}>
-                  {session.entries.map((entry, i) => (
-                    <div key={i} onClick={() => navigate(`/exercise/${entry.exerciseId}`)} className="flex cursor-pointer justify-between text-xs">
-                      <span>{exerciseById(entry.exerciseId, exercises)?.name || entry.exerciseId}</span>
-                      <span className="tabular-nums" style={{ color: 'var(--muted)' }}>{entry.sets.map((s) => `${s.weight}×${s.reps}`).join(', ')}</span>
-                    </div>
-                  ))}
-                  {session.note && <div className="mt-1 text-xs italic" style={{ color: 'var(--muted)' }}>"{session.note}"</div>}
-                </div>
-              )}
+        {filtered.map((session) => (
+          <div
+            key={session.id}
+            onClick={() => navigate(`/session/${session.id}`)}
+            className="flex cursor-pointer items-center justify-between rounded-2xl border p-3.5"
+            style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+          >
+            <div>
+              <div className="text-sm font-semibold">{session.routineName}</div>
+              <div className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>{fmtDate(session.date)} · {totalSets(session)} sets · {session.volume}kg</div>
             </div>
-          )
-        })}
+            <ChevronRightIcon size={16} style={{ color: 'var(--muted)' }} />
+          </div>
+        ))}
         {!filtered.length && <div className="py-8 text-center text-sm" style={{ color: 'var(--muted)' }}>No workouts logged yet.</div>}
       </div>
     </div>

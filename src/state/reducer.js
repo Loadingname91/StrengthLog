@@ -1,6 +1,6 @@
 import { EXERCISES } from '../lib/exercises'
 import { blockTarget, todayISO, localISODate } from '../lib/format'
-import { bestProductForExercise, totalVolume } from '../lib/selectors'
+import { bestProductForExercise, recomputePRFlags, totalVolume } from '../lib/selectors'
 import { backfillSequence } from '../lib/blocks'
 import { uid } from '../lib/id'
 import { nextFreeSeq } from '../lib/reminderPlan'
@@ -338,6 +338,19 @@ export function reducer(state, action) {
         ? { ...state.lastFinishedSession, note: action.payload.note }
         : state.lastFinishedSession
       return { ...state, sessions, lastFinishedSession }
+    }
+
+    case 'DELETE_SESSION': {
+      const sessions = recomputePRFlags(state.sessions.filter((s) => s.id !== action.payload))
+      const lastFinishedSession = state.lastFinishedSession?.id === action.payload ? null : state.lastFinishedSession
+      return { ...state, sessions, lastFinishedSession }
+    }
+
+    case 'RESTART_WORKOUT': {
+      if (!state.activeWorkout) return state
+      const routine = state.routines.find((r) => r.id === state.activeWorkout.routineId)
+      if (!routine) return state
+      return { ...state, activeWorkout: buildActiveWorkoutFromRoutine(routine) }
     }
 
     case 'IMPORT_SESSIONS':

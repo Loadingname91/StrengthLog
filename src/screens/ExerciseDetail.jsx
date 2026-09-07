@@ -120,7 +120,7 @@ export default function ExerciseDetail() {
         <div className="mb-2 text-[13px] font-semibold">History</div>
         <div className="flex flex-col overflow-hidden rounded-xl border" style={{ borderColor: 'var(--border)' }}>
           {[...history].reverse().map((h) => (
-            <div key={h.sessionId} onClick={() => navigate('/stats/log')} className="flex cursor-pointer justify-between border-b p-3 text-[13px] last:border-0" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+            <div key={h.sessionId} onClick={() => navigate(`/session/${h.sessionId}`)} className="flex cursor-pointer justify-between border-b p-3 text-[13px] last:border-0" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
               <span style={{ color: 'var(--muted)' }}>{fmtDate(h.date)}</span>
               <span className="tabular-nums">{h.sets.map((s) => `${s.weight}×${s.reps}`).join(', ')}</span>
             </div>

@@ -332,3 +332,48 @@ describe('Notification "Finish" tap (Phase 9, NOTIF-15)', () => {
     expect(testStore.getState().activeWorkout).toBeNull()
   })
 })
+
+describe('⋮ menu: restart and discard', () => {
+  it('Restart clears every logged set but keeps the workout active', () => {
+    const workout = twoSetWorkout()
+    workout.exercises[0].sets[0] = { ...workout.exercises[0].sets[0], weight: '60', reps: '10', done: true }
+    // RESTART_WORKOUT rebuilds from the routine, so it must be resolvable
+    // in state — twoSetWorkout()'s routineId is 'r1'.
+    const routine = {
+      id: 'r1',
+      name: 'Push Day',
+      position: 'Session 1 of 1',
+      blocks: [{ id: 'block1', type: 'single', exerciseIds: ['bench-press'], sets: 2, repMin: 8, repMax: 12, rest: 90, rir: null, targetWeight: null }],
+    }
+    testStore = createTestStore({ ...baseState(workout), routines: [routine] })
+    render(
+      <MemoryRouter>
+        <ActiveWorkout />
+      </MemoryRouter>
+    )
+
+    fireEvent.click(screen.getByText('⋮'))
+    fireEvent.click(screen.getByText('Restart workout'))
+    fireEvent.click(screen.getByText('Restart'))
+
+    const aw = testStore.getState().activeWorkout
+    expect(aw).not.toBeNull()
+    expect(aw.exercises[0].sets.every((s) => s.weight === '' && !s.done)).toBe(true)
+  })
+
+  it('Discard (after the hold) clears the active workout', () => {
+    vi.useFakeTimers()
+    try {
+      renderWorkout(twoSetWorkout())
+
+      fireEvent.click(screen.getByText('⋮'))
+      fireEvent.click(screen.getByText('Discard workout'))
+      fireEvent.pointerDown(screen.getByText('Discard'))
+      act(() => { vi.advanceTimersByTime(1500) })
+
+      expect(testStore.getState().activeWorkout).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
