@@ -95,10 +95,10 @@ export default function Home() {
                   }}
                 >
                   {schedule.isOverdue
-                    ? `Overdue since ${weekdayName(schedule.weekday, true)}`
+                    ? (schedule.weekday != null ? `Overdue since ${weekdayName(schedule.weekday, true)}` : 'Overdue')
                     : schedule.isToday
                       ? 'Due today'
-                      : `Due ${weekdayName(schedule.weekday, true)}`}
+                      : (schedule.weekday != null ? `Due ${weekdayName(schedule.weekday, true)}` : 'Due soon')}
                 </span>
               )}
             </div>

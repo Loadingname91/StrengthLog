@@ -58,6 +58,43 @@ export function guessMapping(headers) {
   })
 }
 
+// Routine import: one row per exercise-in-a-block. "Superset group" is a
+// short label shared by 2+ consecutive rows within the same routine to
+// merge them into one superset block — blank means its own single-exercise
+// block. "Primary muscle"/"Secondary muscle"/"Equipment" are only read when
+// "Exercise name" doesn't match anything already known (built-in or
+// previously imported), so a brand-new exercise can be defined inline
+// instead of needing a separate import step.
+export const ROUTINE_IMPORT_FIELDS = [
+  'Routine name', 'Superset group', 'Exercise name', 'Sets', 'Rep min', 'Rep max', 'Rest (sec)', 'RIR', 'Target weight',
+  'Primary muscle', 'Secondary muscle', 'Equipment', 'Ignore this column',
+]
+
+const ROUTINE_HEADER_GUESSES = {
+  'Routine name': ['routine', 'routine name', 'workout', 'workout name', 'day'],
+  'Superset group': ['superset', 'superset group', 'group', 'pair'],
+  'Exercise name': ['exercise', 'exercise name', 'movement', 'lift'],
+  Sets: ['sets', 'set count', 'num sets'],
+  'Rep min': ['rep min', 'reps min', 'min reps', 'rep_min'],
+  'Rep max': ['rep max', 'reps max', 'max reps', 'rep_max'],
+  'Rest (sec)': ['rest', 'rest sec', 'rest (sec)', 'rest_seconds'],
+  RIR: ['rir', 'rpe'],
+  'Target weight': ['target weight', 'target_weight', 'weight'],
+  'Primary muscle': ['primary muscle', 'primary', 'muscle'],
+  'Secondary muscle': ['secondary muscle', 'secondary'],
+  Equipment: ['equipment', 'gear'],
+}
+
+export function guessRoutineMapping(headers) {
+  return headers.map((h) => {
+    const lower = h.toLowerCase()
+    for (const [field, guesses] of Object.entries(ROUTINE_HEADER_GUESSES)) {
+      if (guesses.some((g) => lower === g || lower.includes(g))) return field
+    }
+    return 'Ignore this column'
+  })
+}
+
 export function downloadTextFile(filename, mime, content) {
   const blob = new Blob([content], { type: mime })
   const url = URL.createObjectURL(blob)

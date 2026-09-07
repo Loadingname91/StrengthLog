@@ -1,0 +1,8 @@
+exercise_title,workout_date,set_index,weight_kg,reps,rpe
+Bench Press,2026-08-04,1,60,8,8
+Bench Press,2026-08-04,2,60,7,9
+Bench Press,2026-08-04,3,,6,9
+Barbell Row,2026-08-04,1,50,10,7
+Overhead Press,2026-08-06,1,40,8,8
+Overhead Press,2026-08-06,2,40,8,8
+Bulgarian Split Squat,2026-08-06,1,16,12,7
