@@ -1,14 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
 import { useStore } from '../state/StoreContext'
+import { useToast } from '../state/ToastContext'
+import { saveState } from '../state/storage'
 import Card from '../components/Card'
 import SegmentedControl from '../components/SegmentedControl'
 import ConfirmSheet from '../components/ConfirmSheet'
 import { ChevronRightIcon, TrashIcon } from '../components/Icons'
 import { goalProgress } from '../lib/selectors'
 import { checkNotificationPermission, requestNotificationPermission, checkExactAlarmPermission, openExactAlarmSettings } from '../lib/nativeNotifications'
+import { downloadTextFile } from '../lib/csv'
+import { buildBackupFilename, parseBackup } from '../lib/backup'
 
 const PERMISSION_LABEL = { granted: 'Allowed', denied: 'Blocked', prompt: 'Not asked yet', 'prompt-with-rationale': 'Not asked yet' }
 const EXACT_LABEL = { granted: 'Allowed', denied: 'Off — reminders may fire late' }
@@ -25,10 +29,13 @@ function Row({ label, children }) {
 export default function Settings() {
   const { state, dispatch } = useStore()
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleteGoalTarget, setDeleteGoalTarget] = useState(null)
+  const [pendingRestore, setPendingRestore] = useState(null)
   const [permission, setPermission] = useState(null)
   const [exactPermission, setExactPermission] = useState(null)
+  const restoreInputRef = useRef(null)
 
   useEffect(() => {
     function recheck() {
@@ -56,6 +63,33 @@ export default function Settings() {
 
   function set(patch) {
     dispatch({ type: 'SET_SETTINGS', payload: patch })
+  }
+
+  async function onBackupData() {
+    try {
+      await downloadTextFile(buildBackupFilename(), 'application/json', JSON.stringify(state, null, 2))
+      showToast('Backup downloaded')
+    } catch {
+      showToast('Could not create backup')
+    }
+  }
+
+  function onRestoreFileSelected(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = parseBackup(String(reader.result))
+      if (!result.ok) { showToast("That file isn't a valid backup"); return }
+      setPendingRestore(result.data)
+    }
+    reader.readAsText(file)
+  }
+
+  function applyRestore() {
+    saveState(pendingRestore)
+    window.location.reload()
   }
 
   return (
@@ -178,6 +212,21 @@ export default function Settings() {
           <div className="h-px" style={{ background: 'var(--border)' }} />
           <NavRow label="Export & Insights" onClick={() => navigate('/export')} />
           <div className="h-px" style={{ background: 'var(--border)' }} />
+          <button onClick={onBackupData} className="flex w-full items-center justify-between p-3.5 text-sm">
+            Back up data
+          </button>
+          <div className="h-px" style={{ background: 'var(--border)' }} />
+          <button onClick={() => restoreInputRef.current?.click()} className="flex w-full items-center justify-between p-3.5 text-sm">
+            Restore from backup
+          </button>
+          <input
+            ref={restoreInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={onRestoreFileSelected}
+          />
+          <div className="h-px" style={{ background: 'var(--border)' }} />
           <button onClick={() => setConfirmDelete(true)} className="flex w-full items-center justify-between p-3.5 text-sm" style={{ color: 'var(--danger)' }}>
             Delete all data
           </button>
@@ -197,6 +246,17 @@ export default function Settings() {
         holdToConfirm
         onCancel={() => setConfirmDelete(false)}
         onConfirm={() => { dispatch({ type: 'DELETE_ALL_DATA' }); setConfirmDelete(false) }}
+      />
+
+      <ConfirmSheet
+        open={!!pendingRestore}
+        title="Restore backup?"
+        body="This replaces all data on this device with the contents of the backup file. Your current data cannot be recovered afterward unless you have another backup."
+        confirmLabel="Restore"
+        danger
+        holdToConfirm
+        onCancel={() => setPendingRestore(null)}
+        onConfirm={applyRestore}
       />
 
       <ConfirmSheet
