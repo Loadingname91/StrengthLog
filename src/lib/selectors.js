@@ -1,5 +1,6 @@
 import { exerciseById } from './exercises'
 import { startOfWeek, startOfMonth, daysAgo, localISODate, round1 } from './format'
+import { backfillSequence } from './blocks'
 
 // Parses a stored YYYY-MM-DD as *local* midnight. `new Date('2026-01-05')`
 // alone parses as UTC midnight, which lands on the previous day for anyone
@@ -135,6 +136,29 @@ export function bestProductForExercise(sessions, exerciseId, beforeDate) {
     for (const s of entry.sets) best = Math.max(best, s.weight * s.reps)
   }
   return best
+}
+
+// Minutes to complete this routine. Prefers the real average of past runs
+// once there are any; falls back to a flat 50s/set guess (a round costs 50s
+// per exercise in the pair, matching how set/rep totals elsewhere scale by
+// exerciseIds.length for a superset) only for a routine never finished
+// before. CSV-imported sessions carry durationSec: 0 and would drag the
+// average toward zero, so they're excluded — the same durationSec > 0 guard
+// SessionDetail.jsx already uses for the same reason.
+export function estimateDuration(routine, sessions) {
+  const past = sessions.filter((s) => s.routineId === routine.id && s.durationSec > 0)
+  if (past.length) {
+    const avgSec = past.reduce((sum, s) => sum + s.durationSec, 0) / past.length
+    return Math.round(avgSec / 60)
+  }
+  const seconds = routine.blocks.reduce((sum, block) => {
+    const b = backfillSequence(block)
+    return sum + b.sequence.reduce((s, step) => {
+      if (step.type === 'rest') return s + step.seconds
+      return s + 50 * (b.type === 'superset' ? b.exerciseIds.length : 1)
+    }, 0)
+  }, 0)
+  return Math.round(seconds / 60)
 }
 
 // Re-derives every set's isPR flag (and each session's prCount) from

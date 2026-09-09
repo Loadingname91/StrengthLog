@@ -10,21 +10,7 @@ import { exerciseById } from '../lib/exercises'
 import { uid } from '../lib/id'
 import { weekdayName } from '../lib/schedule'
 import { pushModal, popModal } from '../lib/modalStack'
-import { backfillSequence } from '../lib/blocks'
-
-// 50s of work assumed per set; a round (superset) costs 50s per exercise in
-// the pair, matching how set/rep totals elsewhere already scale by
-// exerciseIds.length for a superset. Rest steps contribute their real duration.
-function estimateDuration(routine) {
-  const seconds = routine.blocks.reduce((sum, block) => {
-    const b = backfillSequence(block)
-    return sum + b.sequence.reduce((s, step) => {
-      if (step.type === 'rest') return s + step.seconds
-      return s + 50 * (b.type === 'superset' ? b.exerciseIds.length : 1)
-    }, 0)
-  }, 0)
-  return Math.round(seconds / 60)
-}
+import { estimateDuration } from '../lib/selectors'
 
 export default function Routines() {
   const { state, dispatch, exercises } = useStore()
@@ -102,7 +88,7 @@ export default function Routines() {
                 <div className="min-w-0 flex-1">
                   <div className="text-[15px] font-semibold">{routine.name}</div>
                   <div className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>
-                    {routine.position} · {exCount} exercises · ~{estimateDuration(routine)} min
+                    {routine.position} · {exCount} exercises · ~{estimateDuration(routine, state.sessions)} min
                   </div>
                 </div>
                 <div className="flex gap-0.5 shrink-0" style={{ opacity: 0.7 }}>

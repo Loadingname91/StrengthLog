@@ -338,7 +338,7 @@ export function BlockEditSheet({ block, restDefault, onCancel, onSave, exercises
   const stepType = block.type === 'superset' ? 'round' : 'set'
 
   function addSetOrRound() {
-    setSequence((prev) => [...prev, { type: stepType }, { type: 'rest', seconds: restDefault }])
+    setSequence((prev) => [...prev, { type: stepType }])
   }
 
   function removeStepAt(index) {
@@ -386,14 +386,13 @@ export function BlockEditSheet({ block, restDefault, onCancel, onSave, exercises
     }
     ordinal++
     const nextIsRest = sequence[i + 1]?.type === 'rest'
-    const isLastStep = i === sequence.length - 1
     return (
       <div key={i}>
         <div className="flex items-center justify-between py-1">
           <span className="text-sm font-semibold">{stepLabel} {ordinal}</span>
           {!onlyOneStepLeft && <button onClick={() => removeStepAt(i)} className="text-lg" style={{ color: 'var(--danger)' }}>×</button>}
         </div>
-        {!nextIsRest && !isLastStep && (
+        {!nextIsRest && (
           <button onClick={() => addRestAfter(i)} className="text-xs font-semibold" style={{ color: 'var(--accent-dark)' }}>+ Add rest</button>
         )}
       </div>

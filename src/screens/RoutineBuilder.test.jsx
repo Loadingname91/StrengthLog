@@ -66,7 +66,7 @@ describe('BlockEditSheet target-weight field', () => {
 })
 
 describe('BlockEditSheet sequence editor', () => {
-  it('adding a set appends a set and a default-duration rest step', () => {
+  it('adding a set appends only a set, no auto-added rest', () => {
     const onSave = vi.fn()
     render(<BlockEditSheet block={sampleBlock()} restDefault={90} onCancel={vi.fn()} onSave={onSave} />)
 
@@ -75,10 +75,21 @@ describe('BlockEditSheet sequence editor', () => {
 
     const { sequence } = onSave.mock.calls[0][0]
     // sampleBlock has sets:3 -> backfilled to 5 steps (set,rest,set,rest,set);
-    // adding one more appends {set},{rest} -> 7 steps, ending in a rest.
-    expect(sequence).toHaveLength(7)
-    expect(sequence.at(-2)).toEqual({ type: 'set' })
-    expect(sequence.at(-1)).toEqual({ type: 'rest', seconds: 90 })
+    // adding one more appends just {set} -> 6 steps, ending in a set.
+    expect(sequence).toHaveLength(6)
+    expect(sequence.at(-1)).toEqual({ type: 'set' })
+  })
+
+  it('"+ Add rest" is available on the final step and appends a trailing rest', () => {
+    const onSave = vi.fn()
+    render(<BlockEditSheet block={sampleBlock({ sets: 1 })} restDefault={90} onCancel={vi.fn()} onSave={onSave} />)
+
+    // backfilled: [set] — a single step, so its "+ Add rest" link is the only one.
+    fireEvent.click(screen.getByText('+ Add rest'))
+    fireEvent.click(screen.getByText('Save exercise'))
+
+    const { sequence } = onSave.mock.calls[0][0]
+    expect(sequence).toEqual([{ type: 'set' }, { type: 'rest', seconds: 90 }])
   })
 
   it('removing a rest row and re-adding it via the gap link round-trips to an equivalent sequence', () => {
@@ -92,7 +103,10 @@ describe('BlockEditSheet sequence editor', () => {
     expect(removeButtons).toHaveLength(3)
     fireEvent.click(removeButtons[1]) // removes the rest row
 
-    fireEvent.click(screen.getByText('+ Add rest'))
+    // Both remaining set steps now show their own "+ Add rest" link (the
+    // last step's is no longer hidden) — click the first, matching this
+    // test's original intent of re-adding rest between set 1 and set 2.
+    fireEvent.click(screen.getAllByText('+ Add rest')[0])
     fireEvent.click(screen.getByText('Save exercise'))
 
     const { sequence } = onSave.mock.calls[0][0]
