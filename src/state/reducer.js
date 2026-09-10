@@ -239,12 +239,75 @@ export function reducer(state, action) {
         restTotalSec = restSeconds
       }
 
-      return { ...state, activeWorkout: { ...aw, exercises, restUntil, restExerciseIndex, restSetIndex, restTotalSec, lastPR: isPR ? { exerciseIndex, setIndex } : aw.lastPR } }
+      // `at` disambiguates two PRs that land on the same {exerciseIndex,
+      // setIndex} coordinate — e.g. after SWAP_EXERCISE clears a unit's sets
+      // and set 0 becomes a PR again. useWorkoutNotifications.js folds it
+      // into its dedupe key so the second PR still fires a notification.
+      return { ...state, activeWorkout: { ...aw, exercises, restUntil, restExerciseIndex, restSetIndex, restTotalSec, lastPR: isPR ? { exerciseIndex, setIndex, at: Date.now() } : aw.lastPR } }
     }
 
     case 'GOTO_EXERCISE':
       if (!state.activeWorkout) return state
       return { ...state, activeWorkout: { ...state.activeWorkout, currentIndex: action.payload } }
+
+    case 'SWAP_EXERCISE': {
+      const aw = state.activeWorkout
+      if (!aw) return state
+      const { exerciseIndex, exerciseId } = action.payload
+      const unit = aw.exercises[exerciseIndex]
+      if (!unit) return state
+      // Swapping one half of a superset is ambiguous (which exercise in the
+      // pair?) — the UI never offers Swap on a superset card, so this is a
+      // defense-in-depth backstop, same posture as START_WORKOUT's guard.
+      if (unit.blockType === 'superset') return state
+      // A re-pick of the exercise already in this slot is a realistic
+      // mis-tap; without this guard it would silently wipe every logged set
+      // for no reason.
+      if (unit.exerciseId === exerciseId) return state
+
+      const nextUnit = {
+        ...unit,
+        exerciseId,
+        exerciseIds: [exerciseId],
+        targetWeight: null,
+        sets: unit.sets.map((s) => ({ ...s, weight: '', reps: '', rir: null, done: false, isPR: false, durationSec: null })),
+      }
+      const exercises = aw.exercises.map((e, i) => (i === exerciseIndex ? nextUnit : e))
+
+      // Opening the exercise picker from a focused input fires a real blur,
+      // which can auto-mark-done and arm a rest / stamp lastPR milliseconds
+      // before this swap wipes that same set — clear both if they point at
+      // the exercise being replaced, or you get a running "Resting"
+      // countdown and a PR badge naming a set that no longer exists.
+      const restRanHere = aw.restExerciseIndex === exerciseIndex
+      const restUntil = restRanHere ? null : aw.restUntil
+      const restExerciseIndex = restRanHere ? null : aw.restExerciseIndex
+      const restSetIndex = restRanHere ? null : aw.restSetIndex
+      const restTotalSec = restRanHere ? null : aw.restTotalSec
+      const lastPR = aw.lastPR?.exerciseIndex === exerciseIndex ? null : aw.lastPR
+
+      return { ...state, activeWorkout: { ...aw, exercises, restUntil, restExerciseIndex, restSetIndex, restTotalSec, lastPR } }
+    }
+
+    case 'ADD_EXERCISE': {
+      const aw = state.activeWorkout
+      if (!aw) return state
+      const block = {
+        id: uid('block'),
+        type: 'single',
+        exerciseIds: [action.payload.exerciseId],
+        sets: 3,
+        rest: state.settings.restDefault,
+        repMin: 8,
+        repMax: 12,
+        rir: 2,
+        targetWeight: null,
+      }
+      // Appended, never inserted — currentIndex/restExerciseIndex/
+      // lastPR.exerciseIndex are raw indices into this array, and appending
+      // is the only way to add a unit without remapping all three.
+      return { ...state, activeWorkout: { ...aw, exercises: [...aw.exercises, expandUnit(block)] } }
+    }
 
     case 'REST_ADJUST': {
       if (!state.activeWorkout?.restUntil) return state
