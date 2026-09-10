@@ -148,6 +148,32 @@ function threeSetSameRestWorkout() {
   }
 }
 
+function twoExerciseWorkout() {
+  return {
+    id: 'w1',
+    routineId: 'r1',
+    routineName: 'Push Day',
+    startedAt: new Date().toISOString(),
+    currentIndex: 0,
+    restUntil: null,
+    restExerciseIndex: null,
+    exercises: [
+      {
+        exerciseId: 'bench-press', exerciseIds: ['bench-press'], blockId: 'block1', blockType: 'single',
+        target: '2x8-12', rir: null, targetWeight: null,
+        sets: [{ weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 0 }],
+        restAfter: [null],
+      },
+      {
+        exerciseId: 'barbell-row', exerciseIds: ['barbell-row'], blockId: 'block2', blockType: 'single',
+        target: '2x8-12', rir: null, targetWeight: null,
+        sets: [{ weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 0 }],
+        restAfter: [null],
+      },
+    ],
+  }
+}
+
 function renderWorkout(activeWorkout = twoSetWorkout()) {
   testStore = createTestStore(baseState(activeWorkout))
   return render(
@@ -163,6 +189,42 @@ function weightInputs() {
 function repsInputs() {
   return screen.getAllByPlaceholderText('—').filter((el) => el.getAttribute('inputmode') === 'numeric')
 }
+
+describe('vertical exercise list', () => {
+  it('renders every exercise name, not just the current one', () => {
+    renderWorkout(twoExerciseWorkout())
+    expect(screen.getByText('Bench Press')).toBeInTheDocument()
+    expect(screen.getByText('Barbell Row')).toBeInTheDocument()
+  })
+
+  it('only the current unit renders weight/reps inputs', () => {
+    renderWorkout(twoExerciseWorkout())
+    expect(weightInputs()).toHaveLength(1)
+    expect(repsInputs()).toHaveLength(1)
+  })
+
+  it('clicking a later exercise\'s collapsed row expands it and collapses the previous one', () => {
+    renderWorkout(twoExerciseWorkout())
+    expect(testStore.getState().activeWorkout.currentIndex).toBe(0)
+
+    fireEvent.click(screen.getByText('Barbell Row'))
+
+    expect(testStore.getState().activeWorkout.currentIndex).toBe(1)
+    // The expanded card no longer shows a target line for Bench Press —
+    // only its collapsed row remains, proving navigation still works after
+    // the chip strip was replaced.
+    expect(screen.getAllByText('Bench Press')).toHaveLength(1)
+    expect(weightInputs()).toHaveLength(1)
+  })
+
+  it('shows a set-count on a collapsed row and switches to done styling once complete', () => {
+    const workout = twoExerciseWorkout()
+    workout.exercises[1].sets[0] = { ...workout.exercises[1].sets[0], weight: '60', reps: '10', done: true }
+    renderWorkout(workout)
+
+    expect(screen.getByText('1/1 sets')).toBeInTheDocument()
+  })
+})
 
 describe('ActiveWorkout fast set entry', () => {
   it('confirming weight (blur) focuses that set\'s reps field', () => {

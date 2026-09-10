@@ -21,6 +21,7 @@ export default function ActiveWorkout() {
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const dingPlayedFor = useRef(null)
   const finishingRef = useRef(false)
+  const expandedRef = useRef(null)
 
   // Hoisted above the `if (!aw) return null` guard below (null-guarded
   // here) so the finishRequested effect — a hook, which the Rules of Hooks
@@ -76,6 +77,12 @@ export default function ActiveWorkout() {
     return () => clearTimeout(t)
   }, [aw?.lastPR])
 
+  // Brings the expanded card into view when the current exercise changes —
+  // scrollIntoView is undefined in jsdom, hence the optional call.
+  useEffect(() => {
+    expandedRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })
+  }, [aw?.currentIndex])
+
   useEffect(() => {
     if (!aw && !finishingRef.current) navigate('/routines', { replace: true })
   }, [aw, navigate])
@@ -95,7 +102,6 @@ export default function ActiveWorkout() {
   const elapsedSec = Math.floor((now - new Date(aw.startedAt).getTime()) / 1000)
   const doneExercises = aw.exercises.filter((ex) => ex.sets.every((s) => s.done)).length
   const progressPct = Math.round((doneExercises / aw.exercises.length) * 100)
-  const current = aw.exercises[aw.currentIndex]
 
   const restRemaining = aw.restUntil ? Math.max(0, Math.ceil((new Date(aw.restUntil).getTime() - now) / 1000)) : 0
   const restTotal = aw.restTotalSec || 90
@@ -142,36 +148,26 @@ export default function ActiveWorkout() {
           </div>
         )}
 
-        <div className="no-scrollbar flex gap-2 overflow-x-auto px-[18px] pb-2.5 pt-1.5">
+        <div className="flex flex-col gap-2 px-[18px] py-1.5">
           {aw.exercises.map((ex, i) => {
-            const done = ex.sets.every((s) => s.done)
             const active = i === aw.currentIndex
             return (
-              <button
-                key={i}
-                onClick={() => dispatch({ type: 'GOTO_EXERCISE', payload: i })}
-                className="shrink-0 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold"
-                style={{
-                  borderColor: active ? 'var(--accent)' : 'var(--border)',
-                  background: active ? 'var(--accent)' : done ? 'var(--accent-light)' : 'var(--surface)',
-                  color: active ? '#fff' : done ? 'var(--accent-dark)' : 'var(--text)',
-                }}
-              >
-                {unitName(ex, exercises)}
-              </button>
+              <div key={`${ex.blockId}:${i}`} ref={active ? expandedRef : null}>
+                {active ? (
+                  <ExpandedExercise
+                    unit={ex}
+                    index={i}
+                    restUntil={aw.restUntil}
+                    restExerciseIndex={aw.restExerciseIndex}
+                    restSetIndex={aw.restSetIndex}
+                    restRemaining={restRemaining}
+                  />
+                ) : (
+                  <CollapsedExerciseRow unit={ex} exercises={exercises} onSelect={() => dispatch({ type: 'GOTO_EXERCISE', payload: i })} />
+                )}
+              </div>
             )
           })}
-        </div>
-
-        <div className="px-[18px] py-1.5">
-          <ExpandedExercise
-            unit={current}
-            index={aw.currentIndex}
-            restUntil={aw.restUntil}
-            restExerciseIndex={aw.restExerciseIndex}
-            restSetIndex={aw.restSetIndex}
-            restRemaining={restRemaining}
-          />
         </div>
 
         {prVisible && (
@@ -229,6 +225,37 @@ export default function ActiveWorkout() {
         onConfirm={() => { dispatch({ type: 'DISCARD_WORKOUT' }); setConfirmDiscard(false) }}
       />
     </div>
+  )
+}
+
+// A non-current exercise in the vertical list — name, target, and a
+// done-count, the whole row doubling as the GOTO_EXERCISE button. This is
+// what replaces the old horizontal chip strip's random-access navigation.
+function CollapsedExerciseRow({ unit, exercises, onSelect }) {
+  const total = unit.sets.length
+  const done = unit.sets.filter((s) => s.done).length
+  const complete = total > 0 && done === total
+  return (
+    <button
+      onClick={onSelect}
+      className="flex w-full items-center justify-between gap-2 rounded-2xl border p-3.5 text-left"
+      style={{ borderColor: complete ? 'var(--accent)' : 'var(--border)', background: complete ? 'var(--accent-light)' : 'var(--surface)' }}
+    >
+      <div className="min-w-0">
+        <div className="truncate text-[15px] font-semibold" style={{ color: complete ? 'var(--accent-dark)' : 'var(--text)' }}>
+          {unitName(unit, exercises)}
+        </div>
+        <div className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>Target {unit.target}</div>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className="tabular-nums text-xs font-semibold" style={{ color: complete ? 'var(--accent-dark)' : 'var(--muted)' }}>{done}/{total} sets</span>
+        {complete && (
+          <span className="flex h-5 w-5 items-center justify-center rounded-full" style={{ background: 'var(--accent)' }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5"><path d="M5 13l4 4L19 7" /></svg>
+          </span>
+        )}
+      </div>
+    </button>
   )
 }
 
