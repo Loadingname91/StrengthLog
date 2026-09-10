@@ -27,7 +27,8 @@ describe('buildInitialState', () => {
 
   it('returns a persisted blob unchanged when localStorage already holds data (DATA-02)', () => {
     const persisted = {
-      routines: [{ id: 'r1', name: 'Push Day' }],
+      // Migration always adds `blocks: []` when a routine has no blocks array.
+      routines: [{ id: 'r1', name: 'Push Day', blocks: [] }],
       routineOrder: ['r1'],
       sessions: [{ id: 's1' }],
       customExercises: [{ id: 'custom-1', name: 'My Exercise' }],
@@ -43,6 +44,13 @@ describe('buildInitialState', () => {
     // even though the persisted blob predates them.
     expect(state.weekdayAssignments).toBeDefined()
     expect(state.scheduleRestartAt).toBeNull()
+    expect(state.exerciseTimerPresets).toEqual({})
+  })
+
+  it('backfills exerciseTimerPresets to {} for a persisted blob that predates it (e.g. an old backup)', () => {
+    localStorage.setItem(KEY, JSON.stringify({ routines: [], routineOrder: [], sessions: [], customExercises: [] }))
+    const state = buildInitialState()
+    expect(state.exerciseTimerPresets).toEqual({})
   })
 
   it('backfills new settings keys for existing users without discarding their existing choices', () => {

@@ -15,6 +15,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.os.VibrationAttributes
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -342,12 +343,17 @@ class WorkoutService : Service() {
             @Suppress("DEPRECATION")
             getSystemService(VIBRATOR_SERVICE) as Vibrator
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val effect = VibrationEffect.createWaveform(longArrayOf(0, 300, 200, 300), -1)
+            val attrs = VibrationAttributes.Builder().setUsage(VibrationAttributes.USAGE_ALARM).build()
+            vibrator.vibrate(effect, attrs)
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             // VibrationEffect.createWaveform is API 26+ — this call must stay
             // inside the branch, not hoisted above it, or it would resolve
             // (and crash) unconditionally on API 24-25 devices too.
             val effect = VibrationEffect.createWaveform(longArrayOf(0, 300, 200, 300), -1)
             val attrs = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build()
+            @Suppress("DEPRECATION")
             vibrator.vibrate(effect, attrs)
         } else {
             @Suppress("DEPRECATION")

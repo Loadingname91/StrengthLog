@@ -179,18 +179,22 @@ describe('weekStreak', () => {
   })
 
   it('counts the current week when it has a session', () => {
-    expect(weekStreak([session({ date: isoDaysAgo(0) })])).toBeGreaterThanOrEqual(1)
+    // Use a fixed Monday so the week boundary is deterministic.
+    const monday = new Date(2026, 0, 12) // Mon Jan 12 2026
+    expect(weekStreak([session({ date: '2026-01-12' })], monday)).toBeGreaterThanOrEqual(1)
   })
 
   it('keeps a streak alive when the current week has nothing logged yet', () => {
-    // 8 days back is always in a previous week regardless of which weekday
-    // the test runs on.
-    expect(weekStreak([session({ date: isoDaysAgo(8) })])).toBe(1)
+    // today = Mon Jan 19 (no session this week); session on Jan 12 (the prior
+    // week) → cursor steps back one week and finds it → streak 1.
+    const today = new Date(2026, 0, 19) // Mon Jan 19 2026
+    expect(weekStreak([session({ date: '2026-01-12' })], today)).toBe(1)
   })
 
   it('stops counting at a fully skipped week', () => {
-    const sessions = [session({ date: isoDaysAgo(0) }), session({ date: isoDaysAgo(21) })]
-    expect(weekStreak(sessions)).toBe(1)
+    const monday = new Date(2026, 0, 19) // Mon Jan 19 2026
+    const sessions = [session({ date: '2026-01-19' }), session({ date: '2026-12-28' })]
+    expect(weekStreak(sessions, monday)).toBe(1)
   })
 })
 

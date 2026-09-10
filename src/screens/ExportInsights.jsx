@@ -25,12 +25,12 @@ export default function ExportInsights() {
   const hasData = inRange.length > 0
 
   async function exportCSV() {
-    const headers = ['Date', 'Routine', 'Exercise', 'Set #', 'Weight', 'Reps', 'RIR']
+    const headers = ['Date', 'Routine', 'Exercise', 'Set #', 'Weight', 'Reps', 'RIR', 'Duration (s)']
     const rows = []
     for (const s of inRange) {
       for (const entry of s.entries) {
         entry.sets.forEach((set, i) => {
-          rows.push([s.date, s.routineName, exerciseById(entry.exerciseId, exercises)?.name || entry.exerciseId, i + 1, set.weight, set.reps, set.rir ?? ''])
+          rows.push([s.date, s.routineName, exerciseById(entry.exerciseId, exercises)?.name || entry.exerciseId, i + 1, set.weight, set.reps, set.rir ?? '', set.durationSec ?? ''])
         })
       }
     }

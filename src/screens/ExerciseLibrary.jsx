@@ -1,19 +1,29 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../state/StoreContext'
 import { BackIcon, SearchIcon } from '../components/Icons'
 import { MUSCLES, EQUIPMENT } from '../lib/muscles'
 import { searchExercises } from '../lib/exercises'
+import { pushModal, popModal } from '../lib/modalStack'
 
 // Full-screen overlay used both by the Routine Builder ("+ Add Exercise")
-// and — via the same component — for a future in-session swap. Not a
-// router route: whatever launched it gets the picked exercise back through
-// onPick, no return-value routing needed.
+// and for a mid-workout swap/add. Not a router route: whatever launched it
+// gets the picked exercise back through onPick, no return-value routing
+// needed.
 export default function ExerciseLibraryPicker({ onPick, onClose }) {
   const { exercises, dispatch } = useStore()
   const [query, setQuery] = useState('')
   const [muscle, setMuscle] = useState(null)
   const [equipment, setEquipment] = useState(null)
   const [creating, setCreating] = useState(false)
+
+  // Registers on every mount (the caller conditionally mounts this, it
+  // doesn't toggle a persisted instance's visibility like ConfirmSheet
+  // does), so Android hardware back closes the picker instead of falling
+  // through to route navigation.
+  useEffect(() => {
+    const handle = pushModal(onClose)
+    return () => popModal(handle)
+  }, [onClose])
 
   const results = useMemo(() => searchExercises(exercises, query, muscle, equipment), [exercises, query, muscle, equipment])
 

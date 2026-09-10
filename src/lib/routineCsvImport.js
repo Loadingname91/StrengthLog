@@ -1,6 +1,7 @@
 import { MUSCLES, EQUIPMENT } from './muscles'
 import { matchExercise } from './csvImport'
 import { uid } from './id'
+import { normalizeBlock } from './blocks'
 
 function slug(name) {
   return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
@@ -48,7 +49,6 @@ export function buildRoutineCandidates(headers, rows, mapping, customExercises) 
     adductors: 'Legs',
     abductors: 'Legs',
     'hip flexors': 'Legs',
-    forearms: 'Biceps',
     brachialis: 'Biceps',
   }
 
@@ -68,14 +68,6 @@ export function buildRoutineCandidates(headers, rows, mapping, customExercises) 
     return m.trim() // return original to be flagged if no match
   }
 
-  function normalizeEquipment(e) {
-    if (!e) return ''
-    const first = e.split(/[,/]/)[0].trim().toLowerCase()
-    if (EQUIPMENT_ALIASES[first]) return EQUIPMENT_ALIASES[first]
-    const cap = first.charAt(0).toUpperCase() + first.slice(1)
-    if (EQUIPMENT.includes(cap)) return cap
-    return e.trim()
-  }
 
   return rows.map((row, i) => {
     const routineName = iRoutine >= 0 ? row[iRoutine]?.trim() : ''
@@ -178,9 +170,20 @@ export function finalizeRoutineImport(candidates, includeFlagged, existingRoutin
     const routine = routines[routineIndex.get(c.routineName)]
     const exerciseId = exerciseIdFor(c)
     const groupKey = c.supersetGroup || null
+    const exData = {
+      exerciseId,
+      sets: c.sets,
+      repMin: c.repMin,
+      repMax: c.repMax,
+      rest: c.rest,
+      rir: c.rir,
+      targetWeight: c.targetWeight,
+    }
 
     if (groupKey && routine.blockIndex.has(groupKey)) {
-      routine.blocks[routine.blockIndex.get(groupKey)].exerciseIds.push(exerciseId)
+      const existingBlock = routine.blocks[routine.blockIndex.get(groupKey)]
+      existingBlock.exerciseIds.push(exerciseId)
+      existingBlock.exercises.push(exData)
       continue
     }
 
@@ -188,6 +191,7 @@ export function finalizeRoutineImport(candidates, includeFlagged, existingRoutin
       id: uid('block'),
       type: groupKey ? 'superset' : 'single',
       exerciseIds: [exerciseId],
+      ...(groupKey ? { exercises: [exData] } : {}),
       sets: c.sets,
       repMin: c.repMin,
       repMax: c.repMax,
@@ -203,7 +207,35 @@ export function finalizeRoutineImport(candidates, includeFlagged, existingRoutin
     id: r.id,
     name: r.name,
     position: `Session ${existingRoutineCount + i + 1} of ${existingRoutineCount + routines.length}`,
-    blocks: r.blocks.map(({ id, type, exerciseIds, sets, repMin, repMax, rest, rir, targetWeight }) => ({ id, type, exerciseIds, sets, repMin, repMax, rest, rir, targetWeight })),
+    blocks: r.blocks.map((b) => {
+      const norm = normalizeBlock(b)
+      if (norm.type === 'superset') {
+        return {
+          id: norm.id,
+          type: 'superset',
+          exerciseIds: norm.exerciseIds,
+          exercises: norm.exercises,
+          sets: b.sets,
+          repMin: b.repMin,
+          repMax: b.repMax,
+          rest: b.rest,
+          rir: b.rir,
+          targetWeight: b.targetWeight,
+        }
+      }
+      return {
+        id: norm.id,
+        type: 'single',
+        exerciseIds: norm.exerciseIds,
+        sets: b.sets,
+        repMin: b.repMin,
+        repMax: b.repMax,
+        rest: b.rest,
+        rir: b.rir,
+        targetWeight: b.targetWeight,
+        sequence: norm.sequence,
+      }
+    }),
   }))
 
   const newExercises = [...defs.values()].map((d) => ({
