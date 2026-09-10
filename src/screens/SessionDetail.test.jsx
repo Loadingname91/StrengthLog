@@ -114,6 +114,23 @@ describe('SessionDetail', () => {
     expect(screen.getByTitle('PR')).toBeInTheDocument()
   })
 
+  it('renders a duration-only set as "Ns" instead of "0kg × 0"', () => {
+    renderDetail(sampleSession({
+      entries: [{ exerciseId: 'plank', blockId: 'block1', sets: [{ weight: 0, reps: 0, rir: null, isPR: false, durationSec: 45 }] }],
+    }))
+
+    expect(screen.getByText('45s')).toBeInTheDocument()
+    expect(screen.queryByText('0kg × 0')).not.toBeInTheDocument()
+  })
+
+  it('renders a logged weight/reps set with a durationSec alongside it', () => {
+    renderDetail(sampleSession({
+      entries: [{ exerciseId: 'bench-press', blockId: 'block1', sets: [{ weight: 60, reps: 10, rir: 2, isPR: false, durationSec: 12 }] }],
+    }))
+
+    expect(screen.getByText('60kg × 10 · 12s')).toBeInTheDocument()
+  })
+
   it('redirects to the log when the session id is unknown', () => {
     testSessionId = 'does-not-exist'
     testStore = createTestStore(baseState({ sessions: [sampleSession()] }))

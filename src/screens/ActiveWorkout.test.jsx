@@ -43,6 +43,7 @@ function baseState(activeWorkout) {
     user: { name: 'Athlete' },
     customExercises: [],
     exerciseNotes: {},
+    exerciseTimerPresets: {},
     importPresets: [],
     lastFinishedSession: null,
     routines: [],
@@ -281,6 +282,54 @@ describe('add exercise', () => {
     // shows as a collapsed row, contributing no inputs of its own.
     expect(weightInputs()).toHaveLength(2)
     expect(screen.getByText('0/3 sets')).toBeInTheDocument()
+  })
+})
+
+describe('quick timer', () => {
+  it('shows preset chips seeded from exerciseTimerPresets for the targeted exercise', () => {
+    const workout = twoSetWorkout()
+    testStore = createTestStore({ ...baseState(workout), exerciseTimerPresets: { 'bench-press': [30, 60] } })
+    render(
+      <MemoryRouter>
+        <ActiveWorkout />
+      </MemoryRouter>
+    )
+
+    fireEvent.click(screen.getByText('Timer'))
+
+    expect(screen.getByText('30s')).toBeInTheDocument()
+    expect(screen.getByText('60s')).toBeInTheDocument()
+  })
+
+  it('counting a countdown down to completion and logging it sets durationSec, marks the set done, and never arms a rest countdown', () => {
+    vi.useFakeTimers()
+    try {
+      const workout = twoSetWorkout()
+      // Set 0 is already done, so the timer targets set 1 — whose
+      // restAfter is null. Any non-null restUntil afterward could only come
+      // from the sheet's own state, proving it never writes restUntil/
+      // restTotalSec itself (it only ever dispatches SET_SET_FIELD/
+      // TOGGLE_SET_DONE, same as a normal weight/reps completion).
+      workout.exercises[0].sets[0] = { ...workout.exercises[0].sets[0], weight: '60', reps: '10', done: true }
+      testStore = createTestStore({ ...baseState(workout), exerciseTimerPresets: { 'bench-press': [5] } })
+      render(
+        <MemoryRouter>
+          <ActiveWorkout />
+        </MemoryRouter>
+      )
+
+      fireEvent.click(screen.getByText('Timer'))
+      fireEvent.click(screen.getByText('Start'))
+      act(() => { vi.advanceTimersByTime(5000) })
+      fireEvent.click(screen.getByText('Log 5s'))
+
+      const aw = testStore.getState().activeWorkout
+      expect(aw.exercises[0].sets[1].durationSec).toBe(5)
+      expect(aw.exercises[0].sets[1].done).toBe(true)
+      expect(aw.restUntil).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

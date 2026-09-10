@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../state/StoreContext'
 import ConfirmSheet from '../components/ConfirmSheet'
 import TimerRing from '../components/TimerRing'
+import QuickTimerSheet from '../components/QuickTimerSheet'
 import ExerciseLibraryPicker from './ExerciseLibrary'
 import { BackIcon, ClockIcon } from '../components/Icons'
 import { exerciseById, unitName } from '../lib/exercises'
@@ -180,6 +181,7 @@ export default function ActiveWorkout() {
                   <ExpandedExercise
                     unit={ex}
                     index={i}
+                    now={now}
                     restUntil={aw.restUntil}
                     restExerciseIndex={aw.restExerciseIndex}
                     restSetIndex={aw.restSetIndex}
@@ -307,9 +309,10 @@ function CollapsedExerciseRow({ unit, exercises, onSelect }) {
 // panel toggle. Kept as a real component — not an inline branch — so those
 // hooks (the ghost useMemo especially, an O(sessions × entries) scan) exist
 // only for the unit currently expanded, not for every unit in the list.
-function ExpandedExercise({ unit, index, restUntil, restExerciseIndex, restSetIndex, restRemaining, onSwap }) {
+function ExpandedExercise({ unit, index, restUntil, restExerciseIndex, restSetIndex, restRemaining, onSwap, now }) {
   const { state, dispatch, exercises } = useStore()
   const [helpOpen, setHelpOpen] = useState(false)
+  const [timerOpen, setTimerOpen] = useState(false)
   const weightRefs = useRef({})
   const repsRefs = useRef({})
 
@@ -328,6 +331,16 @@ function ExpandedExercise({ unit, index, restUntil, restExerciseIndex, restSetIn
     const roundIdx = Math.floor(si / unitExerciseIds.length)
     return ghostByExercise[exIdx]?.[roundIdx]
   }
+
+  // Targets the first not-done set (falling back to the last) so the timer
+  // lands its result on whichever set the user is actually about to log.
+  const timerSetIndex = (() => {
+    const i = unit.sets.findIndex((s) => !s.done)
+    return i === -1 ? unit.sets.length - 1 : i
+  })()
+  const timerExerciseId = isSuperset ? unit.exerciseIds[unit.sets[timerSetIndex].exerciseIndex] : unit.exerciseId
+  const timerExerciseName = isSuperset ? unitName({ exerciseId: timerExerciseId }, exercises) : unitName(unit, exercises)
+  const timerPresets = (state.exerciseTimerPresets || {})[timerExerciseId] || []
 
   return (
     <div className="rounded-[20px] border p-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
@@ -348,6 +361,13 @@ function ExpandedExercise({ unit, index, restUntil, restExerciseIndex, restSetIn
               Swap
             </button>
           )}
+          <button
+            onClick={() => setTimerOpen(true)}
+            className="rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+            style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
+          >
+            Timer
+          </button>
           {!isSuperset && (
             <button
               onClick={() => setHelpOpen((v) => !v)}
@@ -470,6 +490,22 @@ function ExpandedExercise({ unit, index, restUntil, restExerciseIndex, restSetIn
           − Remove Set
         </button>
       </div>
+
+      {timerOpen && (
+        <QuickTimerSheet
+          exerciseName={timerExerciseName}
+          presets={timerPresets}
+          now={now}
+          onClose={() => setTimerOpen(false)}
+          onLog={(seconds) => {
+            dispatch({ type: 'SET_SET_FIELD', payload: { exerciseIndex: index, setIndex: timerSetIndex, field: 'durationSec', value: seconds } })
+            if (!unit.sets[timerSetIndex].done) {
+              dispatch({ type: 'TOGGLE_SET_DONE', payload: { exerciseIndex: index, setIndex: timerSetIndex } })
+            }
+          }}
+          onSavePreset={(seconds) => dispatch({ type: 'ADD_TIMER_PRESET', payload: { exerciseId: timerExerciseId, seconds } })}
+        />
+      )}
     </div>
   )
 }
@@ -628,6 +664,17 @@ function SetRow({
               {r === 3 ? '3+' : r} RIR
             </button>
           ))}
+        </div>
+      )}
+      {set.durationSec != null && (
+        <div className="col-span-5 -mt-1 flex items-center gap-1.5 pl-9">
+          <button
+            onClick={() => setField('durationSec', null)}
+            className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+            style={{ borderColor: 'var(--accent)', background: 'var(--accent-light)', color: 'var(--accent-dark)' }}
+          >
+            {set.durationSec}s <span style={{ opacity: 0.7 }}>×</span>
+          </button>
         </div>
       )}
     </div>
