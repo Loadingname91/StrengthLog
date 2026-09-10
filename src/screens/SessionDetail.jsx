@@ -107,7 +107,11 @@ export default function SessionDetail() {
                     {state.settings.showRIR && set.rir != null && (
                       <span style={{ color: 'var(--muted)' }}>RIR {set.rir}</span>
                     )}
-                    <span className="tabular-nums font-semibold">{set.weight}kg × {set.reps}</span>
+                    <span className="tabular-nums font-semibold">
+                      {set.weight === 0 && set.reps === 0 && set.durationSec != null
+                        ? `${set.durationSec}s`
+                        : `${set.weight}kg × ${set.reps}${set.durationSec != null ? ` · ${set.durationSec}s` : ''}`}
+                    </span>
                     {set.isPR && <span title="PR">🏆</span>}
                   </div>
                 </div>

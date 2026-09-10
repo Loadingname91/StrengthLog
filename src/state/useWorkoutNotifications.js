@@ -43,7 +43,11 @@ export function useWorkoutNotifications(state, dispatch, exercises) {
   const exerciseName = currentUnit ? unitName(currentUnit, exercises) : null
   const lastPRExerciseIndex = aw?.lastPR?.exerciseIndex ?? null
   const lastPRSetIndex = aw?.lastPR?.setIndex ?? null
-  const prKey = aw?.lastPR ? `${awId}:${lastPRExerciseIndex}:${lastPRSetIndex}` : null
+  // `at` disambiguates two PRs landing on the same {exerciseIndex,setIndex}
+  // — e.g. SWAP_EXERCISE clears a unit's sets, so its set 0 can become a PR
+  // again at the same coordinate a previous PR already fired for. `?? ''`
+  // keeps a hand-built lastPR fixture without `at` (older tests) working.
+  const prKey = aw?.lastPR ? `${awId}:${lastPRExerciseIndex}:${lastPRSetIndex}:${aw.lastPR.at ?? ''}` : null
 
   const lastPRUnit = aw && lastPRExerciseIndex != null ? aw.exercises[lastPRExerciseIndex] : null
   const lastPRSet = lastPRUnit && lastPRSetIndex != null ? lastPRUnit.sets[lastPRSetIndex] : null

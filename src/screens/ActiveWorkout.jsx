@@ -1,25 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../state/StoreContext'
 import ConfirmSheet from '../components/ConfirmSheet'
+import TimerRing from '../components/TimerRing'
+import QuickTimerSheet from '../components/QuickTimerSheet'
+import ExerciseLibraryPicker from './ExerciseLibrary'
 import { BackIcon, ClockIcon } from '../components/Icons'
 import { exerciseById, unitName } from '../lib/exercises'
 import { lastSessionSets } from '../lib/selectors'
 import { fmtElapsed, todayISO } from '../lib/format'
-
-function beep() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)()
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.frequency.value = 880
-    gain.gain.setValueAtTime(0.15, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
-    osc.connect(gain).connect(ctx.destination)
-    osc.start()
-    osc.stop(ctx.currentTime + 0.4)
-  } catch { /* audio not available */ }
-}
+import { beep } from '../lib/beep'
 
 export default function ActiveWorkout() {
   const { state, dispatch, exercises } = useStore()
@@ -27,15 +17,18 @@ export default function ActiveWorkout() {
   const aw = state.activeWorkout
   const [now, setNow] = useState(() => Date.now())
   const [confirmFinish, setConfirmFinish] = useState(false)
-  const [helpFor, setHelpFor] = useState(null)
   const [prBadge, setPrBadge] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirmRestart, setConfirmRestart] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  // picker: null | { mode: 'add' } | { mode: 'swap', exerciseIndex }
+  const [picker, setPicker] = useState(null)
+  // Set only when a swap needs confirmation (the slot already has logged
+  // data) — holds the swap payload until the ConfirmSheet resolves it.
+  const [pendingSwap, setPendingSwap] = useState(null)
   const dingPlayedFor = useRef(null)
   const finishingRef = useRef(false)
-  const weightRefs = useRef({})
-  const repsRefs = useRef({})
+  const expandedRef = useRef(null)
 
   // Hoisted above the `if (!aw) return null` guard below (null-guarded
   // here) so the finishRequested effect — a hook, which the Rules of Hooks
@@ -91,6 +84,12 @@ export default function ActiveWorkout() {
     return () => clearTimeout(t)
   }, [aw?.lastPR])
 
+  // Brings the expanded card into view when the current exercise changes —
+  // scrollIntoView is undefined in jsdom, hence the optional call.
+  useEffect(() => {
+    expandedRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })
+  }, [aw?.currentIndex])
+
   useEffect(() => {
     if (!aw && !finishingRef.current) navigate('/routines', { replace: true })
   }, [aw, navigate])
@@ -110,15 +109,6 @@ export default function ActiveWorkout() {
   const elapsedSec = Math.floor((now - new Date(aw.startedAt).getTime()) / 1000)
   const doneExercises = aw.exercises.filter((ex) => ex.sets.every((s) => s.done)).length
   const progressPct = Math.round((doneExercises / aw.exercises.length) * 100)
-  const current = aw.exercises[aw.currentIndex]
-  const isSuperset = current.blockType === 'superset'
-  const unitExerciseIds = isSuperset ? current.exerciseIds : [current.exerciseId]
-  const ghostByExercise = unitExerciseIds.map((exId) => lastSessionSets(state.sessions, exId, todayISO()))
-  function ghostFor(si) {
-    const exIdx = current.sets[si].exerciseIndex
-    const roundIdx = Math.floor(si / unitExerciseIds.length)
-    return ghostByExercise[exIdx]?.[roundIdx]
-  }
 
   const restRemaining = aw.restUntil ? Math.max(0, Math.ceil((new Date(aw.restUntil).getTime() - now) / 1000)) : 0
   const restTotal = aw.restTotalSec || 90
@@ -130,8 +120,22 @@ export default function ActiveWorkout() {
     : null
   const prVisible = !!prExercise
 
-  const circumference = 2 * Math.PI * 24
-  const ringOffset = restTotal > 0 ? circumference * (1 - restRemaining / restTotal) : 0
+  function handlePick(exerciseId) {
+    if (picker.mode === 'add') {
+      dispatch({ type: 'ADD_EXERCISE', payload: { exerciseId } })
+      setPicker(null)
+      return
+    }
+    const { exerciseIndex } = picker
+    const unit = aw.exercises[exerciseIndex]
+    const hasLoggedData = unit.sets.some((s) => s.done || s.weight !== '' || s.reps !== '')
+    setPicker(null)
+    if (hasLoggedData) {
+      setPendingSwap({ exerciseIndex, exerciseId })
+    } else {
+      dispatch({ type: 'SWAP_EXERCISE', payload: { exerciseIndex, exerciseId } })
+    }
+  }
 
   return (
     <div className="relative flex h-screen flex-col">
@@ -168,156 +172,35 @@ export default function ActiveWorkout() {
           </div>
         )}
 
-        <div className="no-scrollbar flex gap-2 overflow-x-auto px-[18px] pb-2.5 pt-1.5">
+        <div className="flex flex-col gap-2 px-[18px] py-1.5">
           {aw.exercises.map((ex, i) => {
-            const done = ex.sets.every((s) => s.done)
             const active = i === aw.currentIndex
             return (
-              <button
-                key={i}
-                onClick={() => dispatch({ type: 'GOTO_EXERCISE', payload: i })}
-                className="shrink-0 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold"
-                style={{
-                  borderColor: active ? 'var(--accent)' : 'var(--border)',
-                  background: active ? 'var(--accent)' : done ? 'var(--accent-light)' : 'var(--surface)',
-                  color: active ? '#fff' : done ? 'var(--accent-dark)' : 'var(--text)',
-                }}
-              >
-                {unitName(ex, exercises)}
-              </button>
+              <div key={`${ex.blockId}:${i}`} ref={active ? expandedRef : null}>
+                {active ? (
+                  <ExpandedExercise
+                    unit={ex}
+                    index={i}
+                    now={now}
+                    restUntil={aw.restUntil}
+                    restExerciseIndex={aw.restExerciseIndex}
+                    restSetIndex={aw.restSetIndex}
+                    restRemaining={restRemaining}
+                    onSwap={() => setPicker({ mode: 'swap', exerciseIndex: i })}
+                  />
+                ) : (
+                  <CollapsedExerciseRow unit={ex} exercises={exercises} onSelect={() => dispatch({ type: 'GOTO_EXERCISE', payload: i })} />
+                )}
+              </div>
             )
           })}
-        </div>
-
-        <div className="px-[18px] py-1.5">
-          <div className="rounded-[20px] border p-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="font-serif text-[19px] font-semibold truncate">{unitName(current, exercises)}</div>
-                <div className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>Target {current.target}</div>
-              </div>
-              {!isSuperset && (
-                <button
-                  onClick={() => setHelpFor(helpFor === current.exerciseId ? null : current.exerciseId)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold"
-                  style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
-                >
-                  ?
-                </button>
-              )}
-            </div>
-            {!isSuperset && helpFor === current.exerciseId && (
-              <div className="mt-2 rounded-xl p-2.5 text-xs" style={{ background: 'var(--surface-alt)', color: 'var(--muted)' }}>
-                {state.exerciseNotes[current.exerciseId] || 'Control the eccentric, keep tension on the target muscle, and stop 1-2 reps shy of failure.'}
-              </div>
-            )}
-
-            {!isSuperset && (
-              <div className="mt-4 grid grid-cols-[28px_1fr_1fr_1fr_30px] items-center gap-2 text-[11px] font-semibold" style={{ color: 'var(--muted)' }}>
-                <span>Set</span><span>Last</span><span>Weight</span><span>Reps</span><span />
-              </div>
-            )}
-
-            {current.sets.map((set, si) => {
-              const restSeconds = current.restAfter[si]
-              const restState = !set.done ? 'upcoming'
-                : (aw.restUntil && aw.restExerciseIndex === aw.currentIndex && aw.restSetIndex === si) ? 'active'
-                  : 'passed'
-              const restRow = restSeconds != null && (
-                <RestRow key={`rest-${si}`} seconds={restSeconds} rowState={restState} remaining={restRemaining} />
-              )
-
-              if (!isSuperset) {
-                return (
-                  <div key={si}>
-                    <SetRow
-                      exerciseIndex={aw.currentIndex}
-                      setIndex={si}
-                      set={set}
-                      ghost={ghostFor(si)}
-                      targetWeight={current.targetWeight}
-                      showRIR={state.settings.showRIR}
-                      isLastSet={si === current.sets.length - 1}
-                      registerWeightRef={(el) => { weightRefs.current[si] = el }}
-                      registerRepsRef={(el) => { repsRefs.current[si] = el }}
-                      focusReps={() => repsRefs.current[si]?.focus()}
-                      focusNextWeightOrBlur={() => {
-                        const next = weightRefs.current[si + 1]
-                        if (next) next.focus()
-                        else repsRefs.current[si]?.blur()
-                      }}
-                    />
-                    {restRow}
-                  </div>
-                )
-              }
-
-              // Superset: group every unitExerciseIds.length consecutive
-              // sets into one visually-grouped round, each row labeled by
-              // the exercise it belongs to. Only the round's first position
-              // opens the group wrapper; the rest ride along inside it.
-              const posInRound = si % unitExerciseIds.length
-              if (posInRound !== 0) return null
-              const lastInRound = si + unitExerciseIds.length - 1
-              const roundRestSeconds = current.restAfter[lastInRound]
-              const roundRestState = !current.sets[lastInRound]?.done ? 'upcoming'
-                : (aw.restUntil && aw.restExerciseIndex === aw.currentIndex && aw.restSetIndex === lastInRound) ? 'active'
-                  : 'passed'
-              return (
-                <div key={`round-${si}`} className="mt-2.5 rounded-xl p-2.5" style={{ background: 'var(--surface-alt)' }}>
-                  <div className="mb-1.5 text-[13px] font-bold" style={{ color: 'var(--muted)' }}>
-                    Round {Math.floor(si / unitExerciseIds.length) + 1}
-                  </div>
-                  {unitExerciseIds.map((exId, k) => {
-                    const rowIndex = si + k
-                    if (rowIndex >= current.sets.length) return null
-                    return (
-                      <div key={rowIndex}>
-                        <div className="text-[11.5px] font-semibold" style={{ color: 'var(--muted)' }}>{exerciseById(exId, exercises)?.name || exId}</div>
-                        <SetRow
-                          exerciseIndex={aw.currentIndex}
-                          setIndex={rowIndex}
-                          set={current.sets[rowIndex]}
-                          ghost={ghostFor(rowIndex)}
-                          targetWeight={current.targetWeight}
-                          showRIR={state.settings.showRIR}
-                          isLastSet={rowIndex === current.sets.length - 1}
-                          registerWeightRef={(el) => { weightRefs.current[rowIndex] = el }}
-                          registerRepsRef={(el) => { repsRefs.current[rowIndex] = el }}
-                          focusReps={() => repsRefs.current[rowIndex]?.focus()}
-                          focusNextWeightOrBlur={() => {
-                            const next = weightRefs.current[rowIndex + 1]
-                            if (next) next.focus()
-                            else repsRefs.current[rowIndex]?.blur()
-                          }}
-                        />
-                      </div>
-                    )
-                  })}
-                  {roundRestSeconds != null && (
-                    <RestRow seconds={roundRestSeconds} rowState={roundRestState} remaining={restRemaining} />
-                  )}
-                </div>
-              )
-            })}
-
-            <div className="mt-2.5 flex gap-2">
-              <button
-                onClick={() => dispatch({ type: 'ADD_SET', payload: { exerciseIndex: aw.currentIndex } })}
-                className="flex-1 rounded-[10px] border border-dashed p-2 text-xs font-semibold"
-                style={{ borderColor: 'var(--border)', color: 'var(--accent-dark)' }}
-              >
-                + Add Set
-              </button>
-              <button
-                onClick={() => dispatch({ type: 'REMOVE_SET', payload: { exerciseIndex: aw.currentIndex } })}
-                className="flex-1 rounded-[10px] border border-dashed p-2 text-xs font-semibold"
-                style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
-              >
-                − Remove Set
-              </button>
-            </div>
-          </div>
+          <button
+            onClick={() => setPicker({ mode: 'add' })}
+            className="rounded-2xl border border-dashed p-3 text-[13px] font-semibold"
+            style={{ borderColor: 'var(--border)', color: 'var(--accent-dark)' }}
+          >
+            + Add exercise
+          </button>
         </div>
 
         {prVisible && (
@@ -330,17 +213,7 @@ export default function ActiveWorkout() {
 
         {restVisible && (
           <div className="sticky bottom-0 z-10 flex items-center gap-4 border-t px-5 py-3.5" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-            <div className="relative h-14 w-14 shrink-0">
-              <svg width="56" height="56" viewBox="0 0 56 56">
-                <circle cx="28" cy="28" r="24" fill="none" stroke="var(--surface-alt)" strokeWidth="5" />
-                <circle
-                  cx="28" cy="28" r="24" fill="none" stroke="var(--accent)" strokeWidth="5"
-                  strokeDasharray={circumference} strokeDashoffset={ringOffset}
-                  transform="rotate(-90 28 28)" strokeLinecap="round"
-                />
-              </svg>
-              <div className="tabular-nums absolute inset-0 flex items-center justify-center text-[13px] font-bold">{fmtElapsed(restRemaining)}</div>
-            </div>
+            <TimerRing remaining={restRemaining} total={restTotal} />
             <div className="flex-1 text-[13px]" style={{ color: 'var(--muted)' }}>Resting</div>
             <button onClick={() => dispatch({ type: 'REST_ADJUST', payload: -15 })} className="rounded-[10px] border px-2.5 py-1.5 text-xs font-semibold" style={{ borderColor: 'var(--border)' }}>−15s</button>
             <button onClick={() => dispatch({ type: 'REST_ADJUST', payload: 15 })} className="rounded-[10px] border px-2.5 py-1.5 text-xs font-semibold" style={{ borderColor: 'var(--border)' }}>+15s</button>
@@ -367,7 +240,7 @@ export default function ActiveWorkout() {
       <ConfirmSheet
         open={confirmRestart}
         title="Restart this workout?"
-        body="Every logged set will be cleared and the routine will start over from the top."
+        body="Every logged set is cleared, and any exercise you swapped or added this session goes back to the routine's."
         confirmLabel="Restart"
         danger
         onCancel={() => setConfirmRestart(false)}
@@ -384,6 +257,255 @@ export default function ActiveWorkout() {
         onCancel={() => setConfirmDiscard(false)}
         onConfirm={() => { dispatch({ type: 'DISCARD_WORKOUT' }); setConfirmDiscard(false) }}
       />
+
+      <ConfirmSheet
+        open={!!pendingSwap}
+        title="Swap this exercise?"
+        body="This clears the sets you've already logged for it in this workout. Your routine itself isn't changed."
+        confirmLabel="Swap"
+        danger
+        onCancel={() => setPendingSwap(null)}
+        onConfirm={() => { dispatch({ type: 'SWAP_EXERCISE', payload: pendingSwap }); setPendingSwap(null) }}
+      />
+
+      {picker && <ExerciseLibraryPicker onPick={handlePick} onClose={() => setPicker(null)} />}
+    </div>
+  )
+}
+
+// A non-current exercise in the vertical list — name, target, and a
+// done-count, the whole row doubling as the GOTO_EXERCISE button. This is
+// what replaces the old horizontal chip strip's random-access navigation.
+function CollapsedExerciseRow({ unit, exercises, onSelect }) {
+  const total = unit.sets.length
+  const done = unit.sets.filter((s) => s.done).length
+  const complete = total > 0 && done === total
+  return (
+    <button
+      onClick={onSelect}
+      className="flex w-full items-center justify-between gap-2 rounded-2xl border p-3.5 text-left"
+      style={{ borderColor: complete ? 'var(--accent)' : 'var(--border)', background: complete ? 'var(--accent-light)' : 'var(--surface)' }}
+    >
+      <div className="min-w-0">
+        <div className="truncate text-[15px] font-semibold" style={{ color: complete ? 'var(--accent-dark)' : 'var(--text)' }}>
+          {unitName(unit, exercises)}
+        </div>
+        <div className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>Target {unit.target}</div>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className="tabular-nums text-xs font-semibold" style={{ color: complete ? 'var(--accent-dark)' : 'var(--muted)' }}>{done}/{total} sets</span>
+        {complete && (
+          <span className="flex h-5 w-5 items-center justify-center rounded-full" style={{ background: 'var(--accent)' }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5"><path d="M5 13l4 4L19 7" /></svg>
+          </span>
+        )}
+      </div>
+    </button>
+  )
+}
+
+// Owns everything specific to viewing/logging ONE exercise unit: the ghost
+// (last-session) lookups, the weight/reps focus-chain refs, and the help
+// panel toggle. Kept as a real component — not an inline branch — so those
+// hooks (the ghost useMemo especially, an O(sessions × entries) scan) exist
+// only for the unit currently expanded, not for every unit in the list.
+function ExpandedExercise({ unit, index, restUntil, restExerciseIndex, restSetIndex, restRemaining, onSwap, now }) {
+  const { state, dispatch, exercises } = useStore()
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [timerOpen, setTimerOpen] = useState(false)
+  const weightRefs = useRef({})
+  const repsRefs = useRef({})
+
+  const isSuperset = unit.blockType === 'superset'
+  const unitExerciseIds = isSuperset ? unit.exerciseIds : [unit.exerciseId]
+  // Depends on unit.exerciseId/exerciseIds directly (not the derived
+  // unitExerciseIds array, which is a fresh literal every render for a
+  // single-exercise unit) so this only re-scans state.sessions when the
+  // unit's own identity actually changes, not on every keystroke.
+  const ghostByExercise = useMemo(
+    () => unitExerciseIds.map((exId) => lastSessionSets(state.sessions, exId, todayISO())),
+    [state.sessions, unit.exerciseId, unit.exerciseIds]
+  )
+  function ghostFor(si) {
+    const exIdx = unit.sets[si].exerciseIndex
+    const roundIdx = Math.floor(si / unitExerciseIds.length)
+    return ghostByExercise[exIdx]?.[roundIdx]
+  }
+
+  // Targets the first not-done set (falling back to the last) so the timer
+  // lands its result on whichever set the user is actually about to log.
+  const timerSetIndex = (() => {
+    const i = unit.sets.findIndex((s) => !s.done)
+    return i === -1 ? unit.sets.length - 1 : i
+  })()
+  const timerExerciseId = isSuperset ? unit.exerciseIds[unit.sets[timerSetIndex].exerciseIndex] : unit.exerciseId
+  const timerExerciseName = isSuperset ? unitName({ exerciseId: timerExerciseId }, exercises) : unitName(unit, exercises)
+  const timerPresets = (state.exerciseTimerPresets || {})[timerExerciseId] || []
+
+  return (
+    <div className="rounded-[20px] border p-4" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="font-serif text-[19px] font-semibold truncate">{unitName(unit, exercises)}</div>
+          <div className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>Target {unit.target}</div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {/* Swapping one half of a superset is ambiguous (which exercise in
+              the pair?) — offered only for single-exercise units. */}
+          {!isSuperset && (
+            <button
+              onClick={onSwap}
+              className="rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+              style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
+            >
+              Swap
+            </button>
+          )}
+          <button
+            onClick={() => setTimerOpen(true)}
+            className="rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+            style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
+          >
+            Timer
+          </button>
+          {!isSuperset && (
+            <button
+              onClick={() => setHelpOpen((v) => !v)}
+              className="flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold"
+              style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
+            >
+              ?
+            </button>
+          )}
+        </div>
+      </div>
+      {!isSuperset && helpOpen && (
+        <div className="mt-2 rounded-xl p-2.5 text-xs" style={{ background: 'var(--surface-alt)', color: 'var(--muted)' }}>
+          {state.exerciseNotes[unit.exerciseId] || 'Control the eccentric, keep tension on the target muscle, and stop 1-2 reps shy of failure.'}
+        </div>
+      )}
+
+      {!isSuperset && (
+        <div className="mt-4 grid grid-cols-[28px_1fr_1fr_1fr_30px] items-center gap-2 text-[11px] font-semibold" style={{ color: 'var(--muted)' }}>
+          <span>Set</span><span>Last</span><span>Weight</span><span>Reps</span><span />
+        </div>
+      )}
+
+      {unit.sets.map((set, si) => {
+        const restSeconds = unit.restAfter[si]
+        const restState = !set.done ? 'upcoming'
+          : (restUntil && restExerciseIndex === index && restSetIndex === si) ? 'active'
+            : 'passed'
+        const restRow = restSeconds != null && (
+          <RestRow key={`rest-${si}`} seconds={restSeconds} rowState={restState} remaining={restRemaining} />
+        )
+
+        if (!isSuperset) {
+          return (
+            <div key={si}>
+              <SetRow
+                exerciseIndex={index}
+                setIndex={si}
+                set={set}
+                ghost={ghostFor(si)}
+                targetWeight={unit.targetWeight}
+                showRIR={state.settings.showRIR}
+                isLastSet={si === unit.sets.length - 1}
+                registerWeightRef={(el) => { weightRefs.current[si] = el }}
+                registerRepsRef={(el) => { repsRefs.current[si] = el }}
+                focusReps={() => repsRefs.current[si]?.focus()}
+                focusNextWeightOrBlur={() => {
+                  const next = weightRefs.current[si + 1]
+                  if (next) next.focus()
+                  else repsRefs.current[si]?.blur()
+                }}
+              />
+              {restRow}
+            </div>
+          )
+        }
+
+        // Superset: group every unitExerciseIds.length consecutive
+        // sets into one visually-grouped round, each row labeled by
+        // the exercise it belongs to. Only the round's first position
+        // opens the group wrapper; the rest ride along inside it.
+        const posInRound = si % unitExerciseIds.length
+        if (posInRound !== 0) return null
+        const lastInRound = si + unitExerciseIds.length - 1
+        const roundRestSeconds = unit.restAfter[lastInRound]
+        const roundRestState = !unit.sets[lastInRound]?.done ? 'upcoming'
+          : (restUntil && restExerciseIndex === index && restSetIndex === lastInRound) ? 'active'
+            : 'passed'
+        return (
+          <div key={`round-${si}`} className="mt-2.5 rounded-xl p-2.5" style={{ background: 'var(--surface-alt)' }}>
+            <div className="mb-1.5 text-[13px] font-bold" style={{ color: 'var(--muted)' }}>
+              Round {Math.floor(si / unitExerciseIds.length) + 1}
+            </div>
+            {unitExerciseIds.map((exId, k) => {
+              const rowIndex = si + k
+              if (rowIndex >= unit.sets.length) return null
+              return (
+                <div key={rowIndex}>
+                  <div className="text-[11.5px] font-semibold" style={{ color: 'var(--muted)' }}>{exerciseById(exId, exercises)?.name || exId}</div>
+                  <SetRow
+                    exerciseIndex={index}
+                    setIndex={rowIndex}
+                    set={unit.sets[rowIndex]}
+                    ghost={ghostFor(rowIndex)}
+                    targetWeight={unit.targetWeight}
+                    showRIR={state.settings.showRIR}
+                    isLastSet={rowIndex === unit.sets.length - 1}
+                    registerWeightRef={(el) => { weightRefs.current[rowIndex] = el }}
+                    registerRepsRef={(el) => { repsRefs.current[rowIndex] = el }}
+                    focusReps={() => repsRefs.current[rowIndex]?.focus()}
+                    focusNextWeightOrBlur={() => {
+                      const next = weightRefs.current[rowIndex + 1]
+                      if (next) next.focus()
+                      else repsRefs.current[rowIndex]?.blur()
+                    }}
+                  />
+                </div>
+              )
+            })}
+            {roundRestSeconds != null && (
+              <RestRow seconds={roundRestSeconds} rowState={roundRestState} remaining={restRemaining} />
+            )}
+          </div>
+        )
+      })}
+
+      <div className="mt-2.5 flex gap-2">
+        <button
+          onClick={() => dispatch({ type: 'ADD_SET', payload: { exerciseIndex: index } })}
+          className="flex-1 rounded-[10px] border border-dashed p-2 text-xs font-semibold"
+          style={{ borderColor: 'var(--border)', color: 'var(--accent-dark)' }}
+        >
+          + Add Set
+        </button>
+        <button
+          onClick={() => dispatch({ type: 'REMOVE_SET', payload: { exerciseIndex: index } })}
+          className="flex-1 rounded-[10px] border border-dashed p-2 text-xs font-semibold"
+          style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
+        >
+          − Remove Set
+        </button>
+      </div>
+
+      {timerOpen && (
+        <QuickTimerSheet
+          exerciseName={timerExerciseName}
+          presets={timerPresets}
+          now={now}
+          onClose={() => setTimerOpen(false)}
+          onLog={(seconds) => {
+            dispatch({ type: 'SET_SET_FIELD', payload: { exerciseIndex: index, setIndex: timerSetIndex, field: 'durationSec', value: seconds } })
+            if (!unit.sets[timerSetIndex].done) {
+              dispatch({ type: 'TOGGLE_SET_DONE', payload: { exerciseIndex: index, setIndex: timerSetIndex } })
+            }
+          }}
+          onSavePreset={(seconds) => dispatch({ type: 'ADD_TIMER_PRESET', payload: { exerciseId: timerExerciseId, seconds } })}
+        />
+      )}
     </div>
   )
 }
@@ -542,6 +664,17 @@ function SetRow({
               {r === 3 ? '3+' : r} RIR
             </button>
           ))}
+        </div>
+      )}
+      {set.durationSec != null && (
+        <div className="col-span-5 -mt-1 flex items-center gap-1.5 pl-9">
+          <button
+            onClick={() => setField('durationSec', null)}
+            className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+            style={{ borderColor: 'var(--accent)', background: 'var(--accent-light)', color: 'var(--accent-dark)' }}
+          >
+            {set.durationSec}s <span style={{ opacity: 0.7 }}>×</span>
+          </button>
         </div>
       )}
     </div>
