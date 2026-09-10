@@ -133,6 +133,97 @@ describe('FINISH_WORKOUT', () => {
     // Sequence advances to the next routine (wraps via modulo).
     expect(next.sequenceIndex).toBe(1)
   })
+
+  function workoutWithOneSet(setOverrides) {
+    return {
+      id: 'w1',
+      routineId: 'r1',
+      routineName: 'Push Day',
+      startedAt: '2026-01-01T10:00:00.000Z',
+      currentIndex: 0,
+      restUntil: null,
+      restExerciseIndex: null,
+      exercises: [
+        {
+          exerciseId: 'bench-press',
+          exerciseIds: ['bench-press'],
+          blockId: 'block1',
+          blockType: 'single',
+          target: '3x8-12',
+          rir: 2,
+          sets: [{ weight: '', reps: '', rir: null, done: true, isPR: false, exerciseIndex: 0, ...setOverrides }],
+          restAfter: [null],
+        },
+      ],
+    }
+  }
+
+  it('carries durationSec through onto the session entry', () => {
+    const routine = sampleRoutine('r1')
+    const state = baseState({ routines: [routine], routineOrder: [routine.id], activeWorkout: workoutWithOneSet({ weight: '60', reps: '10', durationSec: 45 }) })
+
+    const next = reducer(state, { type: 'FINISH_WORKOUT', payload: { note: '' } })
+
+    expect(next.sessions[0].entries[0].sets[0].durationSec).toBe(45)
+  })
+
+  it('keeps a done, duration-only set (no weight/reps) instead of silently dropping it', () => {
+    const routine = sampleRoutine('r1')
+    const state = baseState({ routines: [routine], routineOrder: [routine.id], activeWorkout: workoutWithOneSet({ durationSec: 60 }) })
+
+    const next = reducer(state, { type: 'FINISH_WORKOUT', payload: { note: '' } })
+
+    expect(next.sessions[0].entries).toHaveLength(1)
+    expect(next.sessions[0].entries[0].sets[0]).toMatchObject({ weight: 0, reps: 0, durationSec: 60 })
+  })
+
+  it('still drops a done set with neither weight/reps nor a duration', () => {
+    const routine = sampleRoutine('r1')
+    const state = baseState({ routines: [routine], routineOrder: [routine.id], activeWorkout: workoutWithOneSet({}) })
+
+    const next = reducer(state, { type: 'FINISH_WORKOUT', payload: { note: '' } })
+
+    expect(next.sessions[0].entries).toHaveLength(0)
+  })
+})
+
+describe('ADD_TIMER_PRESET / REMOVE_TIMER_PRESET', () => {
+  it('adds a preset, sorted ascending', () => {
+    const state = baseState({ exerciseTimerPresets: { plank: [60] } })
+    const next = reducer(state, { type: 'ADD_TIMER_PRESET', payload: { exerciseId: 'plank', seconds: 30 } })
+    expect(next.exerciseTimerPresets.plank).toEqual([30, 60])
+  })
+
+  it('dedupes an already-present seconds value', () => {
+    const state = baseState({ exerciseTimerPresets: { plank: [60] } })
+    const next = reducer(state, { type: 'ADD_TIMER_PRESET', payload: { exerciseId: 'plank', seconds: 60 } })
+    expect(next).toBe(state)
+  })
+
+  it('caps at 4 presets per exercise, dropping the longest', () => {
+    const state = baseState({ exerciseTimerPresets: { plank: [30, 45, 60, 90] } })
+    const next = reducer(state, { type: 'ADD_TIMER_PRESET', payload: { exerciseId: 'plank', seconds: 20 } })
+    expect(next.exerciseTimerPresets.plank).toEqual([20, 30, 45, 60])
+  })
+
+  it('works against state where exerciseTimerPresets is entirely omitted', () => {
+    const state = baseState()
+    delete state.exerciseTimerPresets
+    const next = reducer(state, { type: 'ADD_TIMER_PRESET', payload: { exerciseId: 'plank', seconds: 60 } })
+    expect(next.exerciseTimerPresets.plank).toEqual([60])
+  })
+
+  it('removes a preset', () => {
+    const state = baseState({ exerciseTimerPresets: { plank: [30, 60] } })
+    const next = reducer(state, { type: 'REMOVE_TIMER_PRESET', payload: { exerciseId: 'plank', seconds: 30 } })
+    expect(next.exerciseTimerPresets.plank).toEqual([60])
+  })
+
+  it('deletes the exercise key entirely once its last preset is removed', () => {
+    const state = baseState({ exerciseTimerPresets: { plank: [60] } })
+    const next = reducer(state, { type: 'REMOVE_TIMER_PRESET', payload: { exerciseId: 'plank', seconds: 60 } })
+    expect(next.exerciseTimerPresets).not.toHaveProperty('plank')
+  })
 })
 
 function sessionWithSet(id, date, exerciseId, weight, reps) {

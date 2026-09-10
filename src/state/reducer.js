@@ -38,7 +38,7 @@ function expandUnit(block) {
       continue
     }
     for (let k = 0; k < n; k++) {
-      sets.push({ weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: k })
+      sets.push({ weight: '', reps: '', rir: null, done: false, isPR: false, durationSec: null, exerciseIndex: k })
       restAfter.push(null)
     }
   }
@@ -85,6 +85,26 @@ export function reducer(state, action) {
 
     case 'UPDATE_EXERCISE_NOTES':
       return { ...state, exerciseNotes: { ...state.exerciseNotes, [action.payload.exerciseId]: action.payload.notes } }
+
+    case 'ADD_TIMER_PRESET': {
+      const { exerciseId, seconds } = action.payload
+      const presets = state.exerciseTimerPresets || {}
+      const list = presets[exerciseId] || []
+      if (list.includes(seconds)) return state
+      const next = [...list, seconds].sort((a, b) => a - b).slice(0, 4)
+      return { ...state, exerciseTimerPresets: { ...presets, [exerciseId]: next } }
+    }
+
+    case 'REMOVE_TIMER_PRESET': {
+      const { exerciseId, seconds } = action.payload
+      const presets = state.exerciseTimerPresets || {}
+      const list = presets[exerciseId] || []
+      const next = list.filter((s) => s !== seconds)
+      const exerciseTimerPresets = { ...presets }
+      if (next.length) exerciseTimerPresets[exerciseId] = next
+      else delete exerciseTimerPresets[exerciseId]
+      return { ...state, exerciseTimerPresets }
+    }
 
     case 'ADD_ROUTINE': {
       const routine = { ...action.payload, id: action.payload.id || uid('routine') }
@@ -185,7 +205,7 @@ export function reducer(state, action) {
         // pair together, keeping the exerciseIndex alternation (and the
         // round-grouping this feeds in ActiveWorkout's UI) intact.
         const n = ex.blockType === 'superset' ? ex.exerciseIds.length : 1
-        const newSets = Array.from({ length: n }, (_, k) => ({ weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: k }))
+        const newSets = Array.from({ length: n }, (_, k) => ({ weight: '', reps: '', rir: null, done: false, isPR: false, durationSec: null, exerciseIndex: k }))
         return { ...ex, sets: [...ex.sets, ...newSets], restAfter: [...ex.restAfter, ...Array(n).fill(null)] }
       })
       return { ...state, activeWorkout: { ...state.activeWorkout, exercises } }
@@ -359,9 +379,14 @@ export function reducer(state, action) {
           return exerciseIds.map((exerciseId, idx) => ({
             exerciseId,
             blockId: ex.blockId,
+            // A timed-only set (a plank, a dead hang) has no weight/reps but
+            // is a real logged set — without the durationSec clause it's
+            // silently dropped even though it was checked off. It saves as
+            // weight:0, reps:0 (parseFloat/parseInt on '' already do that),
+            // which every stats/PR consumer already treats as a no-op.
             sets: ex.sets
-              .filter((s) => s.exerciseIndex === idx && s.done && s.weight !== '' && s.reps !== '')
-              .map((s) => ({ weight: parseFloat(s.weight) || 0, reps: parseInt(s.reps, 10) || 0, rir: s.rir, isPR: !!s.isPR })),
+              .filter((s) => s.exerciseIndex === idx && s.done && ((s.weight !== '' && s.reps !== '') || s.durationSec != null))
+              .map((s) => ({ weight: parseFloat(s.weight) || 0, reps: parseInt(s.reps, 10) || 0, rir: s.rir, isPR: !!s.isPR, durationSec: s.durationSec ?? null })),
           }))
         })
         .filter((e) => e.sets.length)
