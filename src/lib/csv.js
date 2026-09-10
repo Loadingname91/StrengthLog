@@ -1,3 +1,7 @@
+import { Capacitor } from '@capacitor/core'
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
+import { Share } from '@capacitor/share'
+
 // Minimal RFC4180-ish CSV parser/writer — good enough for workout-log
 // exports (quoted fields, commas, escaped quotes) without pulling in a
 // dependency.
@@ -102,7 +106,23 @@ export function guessRoutineMapping(headers) {
   })
 }
 
-export function downloadTextFile(filename, mime, content) {
+// The <a download> blob-URL trick below is a silent no-op inside the
+// Android WebView Capacitor wraps the app in — nothing intercepts the
+// click, so the file never lands anywhere even though it "succeeds". On
+// native platforms, write the file to cache storage instead and hand it to
+// the OS share sheet, which lets the user save it to Downloads, Drive,
+// email it, etc.
+export async function downloadTextFile(filename, mime, content) {
+  if (Capacitor.isNativePlatform()) {
+    const { uri } = await Filesystem.writeFile({
+      path: filename,
+      data: content,
+      directory: Directory.Cache,
+      encoding: Encoding.UTF8,
+    })
+    await Share.share({ url: uri, dialogTitle: filename })
+    return
+  }
   const blob = new Blob([content], { type: mime })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

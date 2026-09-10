@@ -24,7 +24,7 @@ export default function ExportInsights() {
   const insights = useMemo(() => buildInsights(inRange, exercises), [inRange, exercises])
   const hasData = inRange.length > 0
 
-  function exportCSV() {
+  async function exportCSV() {
     const headers = ['Date', 'Routine', 'Exercise', 'Set #', 'Weight', 'Reps', 'RIR', 'Duration (s)']
     const rows = []
     for (const s of inRange) {
@@ -34,8 +34,12 @@ export default function ExportInsights() {
         })
       }
     }
-    downloadTextFile('fitlog-export.csv', 'text/csv', toCSV(headers, rows))
-    showToast('CSV downloaded')
+    try {
+      await downloadTextFile('fitlog-export.csv', 'text/csv', toCSV(headers, rows))
+      showToast('CSV downloaded')
+    } catch {
+      showToast('Could not export CSV')
+    }
   }
 
   function exportPDF() {

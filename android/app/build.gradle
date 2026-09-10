@@ -18,6 +18,23 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Pins the debug build's signature to a keystore committed in the repo
+    // instead of Gradle's default ~/.android/debug.keystore, which CI
+    // auto-generates fresh (with a different key) on every run since GitHub
+    // Actions runners are ephemeral. Without this, every "Android Release"
+    // build has a different signature, so Android refuses to install a new
+    // one as an update over the last — forcing an uninstall, which wipes
+    // the app's data. This keystore uses the same well-known alias/password
+    // as any local debug build ("androiddebugkey"/"android"), so it carries
+    // no real secret.
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false

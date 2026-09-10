@@ -99,9 +99,14 @@ export default function CsvImport() {
     reader.readAsText(file)
   }
 
-  function downloadExample() {
-    if (mode === 'routines') downloadTextFile('fitlog-routines-example.csv', 'text/csv', SAMPLE_ROUTINE_CSV)
-    else downloadTextFile('fitlog-workouts-example.csv', 'text/csv', SAMPLE_CSV)
+  async function downloadExample() {
+    try {
+      if (mode === 'routines') await downloadTextFile('fitlog-routines-example.csv', 'text/csv', SAMPLE_ROUTINE_CSV)
+      else await downloadTextFile('fitlog-workouts-example.csv', 'text/csv', SAMPLE_CSV)
+      showToast('Example CSV downloaded')
+    } catch {
+      showToast('Could not download example CSV')
+    }
   }
 
   async function copyExample() {
