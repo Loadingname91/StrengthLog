@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../state/StoreContext'
 import ConfirmSheet from '../components/ConfirmSheet'
 import TimerRing from '../components/TimerRing'
+import ExerciseLibraryPicker from './ExerciseLibrary'
 import { BackIcon, ClockIcon } from '../components/Icons'
 import { exerciseById, unitName } from '../lib/exercises'
 import { lastSessionSets } from '../lib/selectors'
@@ -19,6 +20,11 @@ export default function ActiveWorkout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirmRestart, setConfirmRestart] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  // picker: null | { mode: 'add' } | { mode: 'swap', exerciseIndex }
+  const [picker, setPicker] = useState(null)
+  // Set only when a swap needs confirmation (the slot already has logged
+  // data) — holds the swap payload until the ConfirmSheet resolves it.
+  const [pendingSwap, setPendingSwap] = useState(null)
   const dingPlayedFor = useRef(null)
   const finishingRef = useRef(false)
   const expandedRef = useRef(null)
@@ -113,6 +119,23 @@ export default function ActiveWorkout() {
     : null
   const prVisible = !!prExercise
 
+  function handlePick(exerciseId) {
+    if (picker.mode === 'add') {
+      dispatch({ type: 'ADD_EXERCISE', payload: { exerciseId } })
+      setPicker(null)
+      return
+    }
+    const { exerciseIndex } = picker
+    const unit = aw.exercises[exerciseIndex]
+    const hasLoggedData = unit.sets.some((s) => s.done || s.weight !== '' || s.reps !== '')
+    setPicker(null)
+    if (hasLoggedData) {
+      setPendingSwap({ exerciseIndex, exerciseId })
+    } else {
+      dispatch({ type: 'SWAP_EXERCISE', payload: { exerciseIndex, exerciseId } })
+    }
+  }
+
   return (
     <div className="relative flex h-screen flex-col">
       <div className="flex-1 overflow-auto pb-24">
@@ -161,6 +184,7 @@ export default function ActiveWorkout() {
                     restExerciseIndex={aw.restExerciseIndex}
                     restSetIndex={aw.restSetIndex}
                     restRemaining={restRemaining}
+                    onSwap={() => setPicker({ mode: 'swap', exerciseIndex: i })}
                   />
                 ) : (
                   <CollapsedExerciseRow unit={ex} exercises={exercises} onSelect={() => dispatch({ type: 'GOTO_EXERCISE', payload: i })} />
@@ -168,6 +192,13 @@ export default function ActiveWorkout() {
               </div>
             )
           })}
+          <button
+            onClick={() => setPicker({ mode: 'add' })}
+            className="rounded-2xl border border-dashed p-3 text-[13px] font-semibold"
+            style={{ borderColor: 'var(--border)', color: 'var(--accent-dark)' }}
+          >
+            + Add exercise
+          </button>
         </div>
 
         {prVisible && (
@@ -207,7 +238,7 @@ export default function ActiveWorkout() {
       <ConfirmSheet
         open={confirmRestart}
         title="Restart this workout?"
-        body="Every logged set will be cleared and the routine will start over from the top."
+        body="Every logged set is cleared, and any exercise you swapped or added this session goes back to the routine's."
         confirmLabel="Restart"
         danger
         onCancel={() => setConfirmRestart(false)}
@@ -224,6 +255,18 @@ export default function ActiveWorkout() {
         onCancel={() => setConfirmDiscard(false)}
         onConfirm={() => { dispatch({ type: 'DISCARD_WORKOUT' }); setConfirmDiscard(false) }}
       />
+
+      <ConfirmSheet
+        open={!!pendingSwap}
+        title="Swap this exercise?"
+        body="This clears the sets you've already logged for it in this workout. Your routine itself isn't changed."
+        confirmLabel="Swap"
+        danger
+        onCancel={() => setPendingSwap(null)}
+        onConfirm={() => { dispatch({ type: 'SWAP_EXERCISE', payload: pendingSwap }); setPendingSwap(null) }}
+      />
+
+      {picker && <ExerciseLibraryPicker onPick={handlePick} onClose={() => setPicker(null)} />}
     </div>
   )
 }
@@ -264,7 +307,7 @@ function CollapsedExerciseRow({ unit, exercises, onSelect }) {
 // panel toggle. Kept as a real component — not an inline branch — so those
 // hooks (the ghost useMemo especially, an O(sessions × entries) scan) exist
 // only for the unit currently expanded, not for every unit in the list.
-function ExpandedExercise({ unit, index, restUntil, restExerciseIndex, restSetIndex, restRemaining }) {
+function ExpandedExercise({ unit, index, restUntil, restExerciseIndex, restSetIndex, restRemaining, onSwap }) {
   const { state, dispatch, exercises } = useStore()
   const [helpOpen, setHelpOpen] = useState(false)
   const weightRefs = useRef({})
@@ -293,15 +336,28 @@ function ExpandedExercise({ unit, index, restUntil, restExerciseIndex, restSetIn
           <div className="font-serif text-[19px] font-semibold truncate">{unitName(unit, exercises)}</div>
           <div className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>Target {unit.target}</div>
         </div>
-        {!isSuperset && (
-          <button
-            onClick={() => setHelpOpen((v) => !v)}
-            className="flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold"
-            style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
-          >
-            ?
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {/* Swapping one half of a superset is ambiguous (which exercise in
+              the pair?) — offered only for single-exercise units. */}
+          {!isSuperset && (
+            <button
+              onClick={onSwap}
+              className="rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+              style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
+            >
+              Swap
+            </button>
+          )}
+          {!isSuperset && (
+            <button
+              onClick={() => setHelpOpen((v) => !v)}
+              className="flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold"
+              style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
+            >
+              ?
+            </button>
+          )}
+        </div>
       </div>
       {!isSuperset && helpOpen && (
         <div className="mt-2 rounded-xl p-2.5 text-xs" style={{ background: 'var(--surface-alt)', color: 'var(--muted)' }}>

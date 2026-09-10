@@ -3,6 +3,7 @@ import { useSyncExternalStore } from 'react'
 import { render, fireEvent, screen, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { reducer } from '../state/reducer'
+import { EXERCISES } from '../lib/exercises'
 import ActiveWorkout from './ActiveWorkout'
 
 // A minimal external store (subscribe/getState/dispatch) bridging the real
@@ -32,7 +33,7 @@ let testStore
 vi.mock('../state/StoreContext', () => ({
   useStore: () => {
     const state = useSyncExternalStore(testStore.subscribe, testStore.getState)
-    return { state, dispatch: testStore.dispatch }
+    return { state, dispatch: testStore.dispatch, exercises: EXERCISES }
   },
 }))
 
@@ -223,6 +224,63 @@ describe('vertical exercise list', () => {
     renderWorkout(workout)
 
     expect(screen.getByText('1/1 sets')).toBeInTheDocument()
+  })
+})
+
+describe('swap exercise', () => {
+  it('opens the exercise library, and picking a new exercise for an untouched unit swaps immediately', () => {
+    renderWorkout(twoSetWorkout()) // untouched: no weight/reps logged yet
+
+    fireEvent.click(screen.getByText('Swap'))
+    expect(screen.getByText('Exercise Library')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Barbell Row'))
+
+    expect(screen.queryByText('Exercise Library')).not.toBeInTheDocument()
+    expect(testStore.getState().activeWorkout.exercises[0].exerciseId).toBe('barbell-row')
+    expect(weightInputs()[0].value).toBe('')
+  })
+
+  it('shows a confirm sheet instead of swapping immediately once the unit has logged data', () => {
+    renderWorkout(twoSetWorkout())
+    fireEvent.change(weightInputs()[0], { target: { value: '60' } })
+
+    fireEvent.click(screen.getByText('Swap'))
+    fireEvent.click(screen.getByText('Barbell Row'))
+
+    expect(screen.getByText('Swap this exercise?')).toBeInTheDocument()
+    // Not swapped yet — still Bench Press, still holding the typed weight.
+    expect(testStore.getState().activeWorkout.exercises[0].exerciseId).toBe('bench-press')
+
+    // Two "Swap" buttons now exist — the card's own trigger, and the confirm
+    // sheet's confirm button, which renders after it in the tree.
+    fireEvent.click(screen.getAllByText('Swap').at(-1))
+
+    expect(testStore.getState().activeWorkout.exercises[0].exerciseId).toBe('barbell-row')
+    expect(weightInputs()[0].value).toBe('')
+  })
+
+  it('renders no Swap button on a superset card', () => {
+    renderWorkout(supersetWorkout())
+    expect(screen.queryByText('Swap')).not.toBeInTheDocument()
+  })
+})
+
+describe('add exercise', () => {
+  it('appends a new collapsed row after picking, without disturbing the current exercise', () => {
+    renderWorkout(twoSetWorkout())
+
+    fireEvent.click(screen.getByText('+ Add exercise'))
+    expect(screen.getByText('Exercise Library')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Barbell Row'))
+
+    expect(screen.queryByText('Exercise Library')).not.toBeInTheDocument()
+    expect(testStore.getState().activeWorkout.exercises).toHaveLength(2)
+    expect(testStore.getState().activeWorkout.currentIndex).toBe(0)
+    // Still expanded on Bench Press (2 sets, per twoSetWorkout); Barbell Row
+    // shows as a collapsed row, contributing no inputs of its own.
+    expect(weightInputs()).toHaveLength(2)
+    expect(screen.getByText('0/3 sets')).toBeInTheDocument()
   })
 })
 
