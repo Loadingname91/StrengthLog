@@ -1,7 +1,7 @@
 import { EXERCISES } from '../lib/exercises'
 import { blockTarget, todayISO, localISODate } from '../lib/format'
 import { bestProductForExercise, recomputePRFlags, totalVolume } from '../lib/selectors'
-import { backfillSequence } from '../lib/blocks'
+import { normalizeBlock } from '../lib/blocks'
 import { uid } from '../lib/id'
 import { nextFreeSeq } from '../lib/reminderPlan'
 
@@ -18,18 +18,87 @@ export function initialSettings() {
 }
 
 // Expands one routine block into a runtime unit. A superset block produces
-// ONE merged unit (not one per exercise) whose flat `sets` array interleaves
-// every exercise's sets in round order, each tagged with `exerciseIndex` —
-// this is what lets a single confirm-to-advance focus chain (see
-// ActiveWorkout.jsx's SetRow) cross from one exercise's set straight into
-// the paired exercise's, with no separate navigation state needed.
-// `restAfter` is a parallel array: restAfter[i] holds the rest duration to
-// start once sets[i] is completed, generalizing what pairIndex/pairSize used
-// to special-case for supersets only into one mechanism for every block.
+// ONE merged unit whose flat `sets` array interleaves every exercise's sets
+// in round order, each tagged with `exerciseIndex` and individual targets.
 function expandUnit(block) {
-  const b = backfillSequence(block)
+  const b = normalizeBlock(block)
   const isSuperset = b.type === 'superset'
-  const n = isSuperset ? b.exerciseIds.length : 1
+
+  if (isSuperset) {
+    const exercises = b.exercises || []
+    // Extract set configs for each exercise from its sequence
+    const exSets = exercises.map((ex) => {
+      const result = []
+      const seq = ex.sequence || []
+      for (let i = 0; i < seq.length; i++) {
+        if (seq[i].type !== 'rest') {
+          const nextIsRest = seq[i + 1]?.type === 'rest'
+          result.push({
+            restAfter: nextIsRest ? seq[i + 1].seconds : null,
+          })
+        }
+      }
+      if (result.length === 0) {
+        result.push({ restAfter: null })
+      }
+      return result
+    })
+
+    const numRounds = Math.max(1, ...exSets.map((s) => s.length))
+    const sets = []
+    const restAfter = []
+
+    for (let r = 0; r < numRounds; r++) {
+      const participating = exercises
+        .map((ex, k) => ({ ex, k, setInfo: exSets[k][r] }))
+        .filter((item) => item.setInfo !== undefined)
+
+      for (let p = 0; p < participating.length; p++) {
+        const item = participating[p]
+        const isLastInRound = p === participating.length - 1
+        let setRest = null
+        if (isLastInRound && r < numRounds - 1) {
+          setRest = item.setInfo.restAfter
+          if (setRest == null) {
+            const fallback = participating.map((x) => x.setInfo.restAfter).find((s) => s != null)
+            if (fallback != null) setRest = fallback
+          }
+        }
+        sets.push({
+          weight: '',
+          reps: '',
+          rir: null,
+          done: false,
+          isPR: false,
+          exerciseIndex: item.k,
+          exerciseId: item.ex.exerciseId,
+          target: blockTarget(item.ex),
+          targetRir: item.ex.rir,
+          targetWeight: item.ex.targetWeight ?? null,
+          roundIndex: r,
+          setIndexInExercise: r,
+        })
+        restAfter.push(setRest)
+      }
+    }
+
+    return {
+      blockId: b.id,
+      blockType: 'superset',
+      exerciseIds: exercises.map((e) => e.exerciseId),
+      exercises: exercises.map((e) => ({
+        ...e,
+        target: blockTarget(e),
+      })),
+      target: exercises[0] ? blockTarget(exercises[0]) : '',
+      rir: exercises[0]?.rir ?? null,
+      targetWeight: exercises[0]?.targetWeight ?? null,
+      sets,
+      restAfter,
+    }
+  }
+
+  // Single block
   const sets = []
   const restAfter = []
   for (const step of b.sequence) {
@@ -37,16 +106,28 @@ function expandUnit(block) {
       if (sets.length > 0) restAfter[sets.length - 1] = step.seconds
       continue
     }
-    for (let k = 0; k < n; k++) {
-      sets.push({ weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: k })
-      restAfter.push(null)
-    }
+    sets.push({
+      weight: '',
+      reps: '',
+      rir: null,
+      done: false,
+      isPR: false,
+      exerciseIndex: 0,
+      exerciseId: b.exerciseIds[0],
+      target: blockTarget(b),
+      targetRir: b.rir,
+      targetWeight: b.targetWeight ?? null,
+      roundIndex: sets.length,
+      setIndexInExercise: sets.length,
+    })
+    restAfter.push(null)
   }
+
   return {
     blockId: b.id,
-    blockType: b.type,
+    blockType: 'single',
     exerciseIds: b.exerciseIds,
-    exerciseId: isSuperset ? undefined : b.exerciseIds[0],
+    exerciseId: b.exerciseIds[0],
     target: blockTarget(b),
     rir: b.rir,
     targetWeight: b.targetWeight ?? null,
@@ -181,12 +262,46 @@ export function reducer(state, action) {
       if (!state.activeWorkout) return state
       const exercises = state.activeWorkout.exercises.map((ex, i) => {
         if (i !== action.payload.exerciseIndex) return ex
-        // A superset round always adds/removes one set per exercise in the
-        // pair together, keeping the exerciseIndex alternation (and the
-        // round-grouping this feeds in ActiveWorkout's UI) intact.
-        const n = ex.blockType === 'superset' ? ex.exerciseIds.length : 1
-        const newSets = Array.from({ length: n }, (_, k) => ({ weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: k }))
-        return { ...ex, sets: [...ex.sets, ...newSets], restAfter: [...ex.restAfter, ...Array(n).fill(null)] }
+        if (ex.blockType === 'superset') {
+          const nextRound = Math.max(0, ...ex.sets.map((s) => s.roundIndex ?? 0)) + 1
+          const newSets = ex.exerciseIds.map((exId, k) => {
+            const exDef = ex.exercises?.[k]
+            return {
+              weight: '',
+              reps: '',
+              rir: null,
+              done: false,
+              isPR: false,
+              exerciseIndex: k,
+              exerciseId: exId,
+              target: exDef?.target || ex.target,
+              targetRir: exDef?.rir ?? ex.rir,
+              targetWeight: exDef?.targetWeight ?? ex.targetWeight ?? null,
+              roundIndex: nextRound,
+              setIndexInExercise: nextRound,
+            }
+          })
+          return {
+            ...ex,
+            sets: [...ex.sets, ...newSets],
+            restAfter: [...ex.restAfter, ...Array(newSets.length).fill(null)],
+          }
+        }
+        const newSet = {
+          weight: '',
+          reps: '',
+          rir: null,
+          done: false,
+          isPR: false,
+          exerciseIndex: 0,
+          exerciseId: ex.exerciseId,
+          target: ex.target,
+          targetRir: ex.rir,
+          targetWeight: ex.targetWeight ?? null,
+          roundIndex: ex.sets.length,
+          setIndexInExercise: ex.sets.length,
+        }
+        return { ...ex, sets: [...ex.sets, newSet], restAfter: [...ex.restAfter, null] }
       })
       return { ...state, activeWorkout: { ...state.activeWorkout, exercises } }
     }
@@ -195,9 +310,20 @@ export function reducer(state, action) {
       if (!state.activeWorkout) return state
       const exercises = state.activeWorkout.exercises.map((ex, i) => {
         if (i !== action.payload.exerciseIndex) return ex
-        const n = ex.blockType === 'superset' ? ex.exerciseIds.length : 1
-        if (ex.sets.length <= n) return ex
-        return { ...ex, sets: ex.sets.slice(0, -n), restAfter: ex.restAfter.slice(0, -n) }
+        if (ex.blockType === 'superset') {
+          const lastRoundIndex = ex.sets[ex.sets.length - 1]?.roundIndex
+          if (lastRoundIndex != null) {
+            if (lastRoundIndex === 0) return ex
+            const remainingSets = ex.sets.filter((s) => s.roundIndex !== lastRoundIndex)
+            const countRemoved = ex.sets.length - remainingSets.length
+            return { ...ex, sets: remainingSets, restAfter: ex.restAfter.slice(0, ex.restAfter.length - countRemoved) }
+          }
+          const n = ex.exerciseIds.length
+          if (ex.sets.length <= n) return ex
+          return { ...ex, sets: ex.sets.slice(0, -n), restAfter: ex.restAfter.slice(0, -n) }
+        }
+        if (ex.sets.length <= 1) return ex
+        return { ...ex, sets: ex.sets.slice(0, -1), restAfter: ex.restAfter.slice(0, -1) }
       })
       return { ...state, activeWorkout: { ...state.activeWorkout, exercises } }
     }

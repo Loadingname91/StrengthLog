@@ -5,7 +5,7 @@ import ConfirmSheet from '../components/ConfirmSheet'
 import { BackIcon, ClockIcon } from '../components/Icons'
 import { exerciseById, unitName } from '../lib/exercises'
 import { lastSessionSets } from '../lib/selectors'
-import { fmtElapsed, todayISO } from '../lib/format'
+import { fmtElapsed, todayISO, blockTarget } from '../lib/format'
 
 function beep() {
   try {
@@ -115,9 +115,20 @@ export default function ActiveWorkout() {
   const unitExerciseIds = isSuperset ? current.exerciseIds : [current.exerciseId]
   const ghostByExercise = unitExerciseIds.map((exId) => lastSessionSets(state.sessions, exId, todayISO()))
   function ghostFor(si) {
-    const exIdx = current.sets[si].exerciseIndex
-    const roundIdx = Math.floor(si / unitExerciseIds.length)
-    return ghostByExercise[exIdx]?.[roundIdx]
+    const s = current.sets[si]
+    if (!s) return null
+    const exIdx = s.exerciseIndex ?? 0
+    const setIdx = s.setIndexInExercise ?? Math.floor(si / Math.max(1, unitExerciseIds.length))
+    return ghostByExercise[exIdx]?.[setIdx]
+  }
+
+  const supersetRounds = []
+  if (isSuperset && current) {
+    current.sets.forEach((set, si) => {
+      const r = set.roundIndex ?? Math.floor(si / Math.max(1, unitExerciseIds.length))
+      if (!supersetRounds[r]) supersetRounds[r] = []
+      supersetRounds[r].push({ set, si })
+    })
   }
 
   const restRemaining = aw.restUntil ? Math.max(0, Math.ceil((new Date(aw.restUntil).getTime() - now) / 1000)) : 0
@@ -194,7 +205,11 @@ export default function ActiveWorkout() {
             <div className="flex items-start justify-between">
               <div>
                 <div className="font-serif text-[19px] font-semibold truncate">{unitName(current, exercises)}</div>
-                <div className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>Target {current.target}</div>
+                <div className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>
+                  {isSuperset && current.exercises?.length
+                    ? current.exercises.map((e) => `${exerciseById(e.exerciseId, exercises)?.name || e.exerciseId}: ${e.target || blockTarget(e)}`).join(' • ')
+                    : `Target ${current.target}`}
+                </div>
               </div>
               {!isSuperset && (
                 <button
@@ -218,16 +233,15 @@ export default function ActiveWorkout() {
               </div>
             )}
 
-            {current.sets.map((set, si) => {
-              const restSeconds = current.restAfter[si]
-              const restState = !set.done ? 'upcoming'
-                : (aw.restUntil && aw.restExerciseIndex === aw.currentIndex && aw.restSetIndex === si) ? 'active'
-                  : 'passed'
-              const restRow = restSeconds != null && (
-                <RestRow key={`rest-${si}`} seconds={restSeconds} rowState={restState} remaining={restRemaining} />
-              )
-
-              if (!isSuperset) {
+            {!isSuperset &&
+              current.sets.map((set, si) => {
+                const restSeconds = current.restAfter[si]
+                const restState = !set.done ? 'upcoming'
+                  : (aw.restUntil && aw.restExerciseIndex === aw.currentIndex && aw.restSetIndex === si) ? 'active'
+                    : 'passed'
+                const restRow = restSeconds != null && (
+                  <RestRow key={`rest-${si}`} seconds={restSeconds} rowState={restState} remaining={restRemaining} />
+                )
                 return (
                   <div key={si}>
                     <SetRow
@@ -235,7 +249,7 @@ export default function ActiveWorkout() {
                       setIndex={si}
                       set={set}
                       ghost={ghostFor(si)}
-                      targetWeight={current.targetWeight}
+                      targetWeight={set.targetWeight ?? current.targetWeight}
                       showRIR={state.settings.showRIR}
                       isLastSet={si === current.sets.length - 1}
                       registerWeightRef={(el) => { weightRefs.current[si] = el }}
@@ -250,56 +264,54 @@ export default function ActiveWorkout() {
                     {restRow}
                   </div>
                 )
-              }
+              })}
 
-              // Superset: group every unitExerciseIds.length consecutive
-              // sets into one visually-grouped round, each row labeled by
-              // the exercise it belongs to. Only the round's first position
-              // opens the group wrapper; the rest ride along inside it.
-              const posInRound = si % unitExerciseIds.length
-              if (posInRound !== 0) return null
-              const lastInRound = si + unitExerciseIds.length - 1
-              const roundRestSeconds = current.restAfter[lastInRound]
-              const roundRestState = !current.sets[lastInRound]?.done ? 'upcoming'
-                : (aw.restUntil && aw.restExerciseIndex === aw.currentIndex && aw.restSetIndex === lastInRound) ? 'active'
-                  : 'passed'
-              return (
-                <div key={`round-${si}`} className="mt-2.5 rounded-xl p-2.5" style={{ background: 'var(--surface-alt)' }}>
-                  <div className="mb-1.5 text-[13px] font-bold" style={{ color: 'var(--muted)' }}>
-                    Round {Math.floor(si / unitExerciseIds.length) + 1}
+            {isSuperset &&
+              supersetRounds.map((round, rIdx) => {
+                const lastItem = round[round.length - 1]
+                const roundRestSeconds = current.restAfter[lastItem.si]
+                const roundRestState = !lastItem.set.done ? 'upcoming'
+                  : (aw.restUntil && aw.restExerciseIndex === aw.currentIndex && aw.restSetIndex === lastItem.si) ? 'active'
+                    : 'passed'
+                return (
+                  <div key={`round-${rIdx}`} className="mt-2.5 rounded-xl p-2.5" style={{ background: 'var(--surface-alt)' }}>
+                    <div className="mb-1.5 text-[13px] font-bold" style={{ color: 'var(--muted)' }}>
+                      Round {rIdx + 1}
+                    </div>
+                    {round.map(({ set, si }) => {
+                      const exId = set.exerciseId || unitExerciseIds[set.exerciseIndex] || current.exerciseId
+                      return (
+                        <div key={si}>
+                          <div className="flex items-center justify-between text-[11.5px] font-semibold" style={{ color: 'var(--muted)' }}>
+                            <span>{exerciseById(exId, exercises)?.name || exId}</span>
+                            {set.target && <span className="text-[10.5px] font-normal">{set.target}</span>}
+                          </div>
+                          <SetRow
+                            exerciseIndex={aw.currentIndex}
+                            setIndex={si}
+                            set={set}
+                            ghost={ghostFor(si)}
+                            targetWeight={set.targetWeight ?? current.targetWeight}
+                            showRIR={state.settings.showRIR}
+                            isLastSet={si === current.sets.length - 1}
+                            registerWeightRef={(el) => { weightRefs.current[si] = el }}
+                            registerRepsRef={(el) => { repsRefs.current[si] = el }}
+                            focusReps={() => repsRefs.current[si]?.focus()}
+                            focusNextWeightOrBlur={() => {
+                              const next = weightRefs.current[si + 1]
+                              if (next) next.focus()
+                              else repsRefs.current[si]?.blur()
+                            }}
+                          />
+                        </div>
+                      )
+                    })}
+                    {roundRestSeconds != null && (
+                      <RestRow seconds={roundRestSeconds} rowState={roundRestState} remaining={restRemaining} />
+                    )}
                   </div>
-                  {unitExerciseIds.map((exId, k) => {
-                    const rowIndex = si + k
-                    if (rowIndex >= current.sets.length) return null
-                    return (
-                      <div key={rowIndex}>
-                        <div className="text-[11.5px] font-semibold" style={{ color: 'var(--muted)' }}>{exerciseById(exId, exercises)?.name || exId}</div>
-                        <SetRow
-                          exerciseIndex={aw.currentIndex}
-                          setIndex={rowIndex}
-                          set={current.sets[rowIndex]}
-                          ghost={ghostFor(rowIndex)}
-                          targetWeight={current.targetWeight}
-                          showRIR={state.settings.showRIR}
-                          isLastSet={rowIndex === current.sets.length - 1}
-                          registerWeightRef={(el) => { weightRefs.current[rowIndex] = el }}
-                          registerRepsRef={(el) => { repsRefs.current[rowIndex] = el }}
-                          focusReps={() => repsRefs.current[rowIndex]?.focus()}
-                          focusNextWeightOrBlur={() => {
-                            const next = weightRefs.current[rowIndex + 1]
-                            if (next) next.focus()
-                            else repsRefs.current[rowIndex]?.blur()
-                          }}
-                        />
-                      </div>
-                    )
-                  })}
-                  {roundRestSeconds != null && (
-                    <RestRow seconds={roundRestSeconds} rowState={roundRestState} remaining={restRemaining} />
-                  )}
-                </div>
-              )
-            })}
+                )
+              })}
 
             <div className="mt-2.5 flex gap-2">
               <button

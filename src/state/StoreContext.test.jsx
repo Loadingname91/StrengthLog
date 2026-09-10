@@ -27,7 +27,8 @@ describe('buildInitialState', () => {
 
   it('returns a persisted blob unchanged when localStorage already holds data (DATA-02)', () => {
     const persisted = {
-      routines: [{ id: 'r1', name: 'Push Day' }],
+      // Migration always adds `blocks: []` when a routine has no blocks array.
+      routines: [{ id: 'r1', name: 'Push Day', blocks: [] }],
       routineOrder: ['r1'],
       sessions: [{ id: 's1' }],
       customExercises: [{ id: 'custom-1', name: 'My Exercise' }],

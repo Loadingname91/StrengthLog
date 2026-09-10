@@ -266,6 +266,47 @@ describe('ActiveWorkout merged superset (Phase 6)', () => {
     expect(aw.restUntil).not.toBeNull()
     expect(aw.restTotalSec).toBe(120)
   })
+
+  it('renders uneven superset with dynamic exercise counts per round', () => {
+    const uneven = {
+      id: 'w-uneven',
+      routineId: 'r1',
+      routineName: 'Push Day',
+      startedAt: new Date().toISOString(),
+      currentIndex: 0,
+      restUntil: null,
+      restExerciseIndex: null,
+      exercises: [
+        {
+          exerciseIds: ['bench-press', 'barbell-row'],
+          blockId: 'block1',
+          blockType: 'superset',
+          exercises: [
+            { exerciseId: 'bench-press', target: '3x8-12', sequence: [{ type: 'set' }, { type: 'rest', seconds: 60 }, { type: 'set' }, { type: 'rest', seconds: 60 }, { type: 'set' }] },
+            { exerciseId: 'barbell-row', target: '2x10-12', sequence: [{ type: 'set' }, { type: 'rest', seconds: 60 }, { type: 'set' }] },
+          ],
+          sets: [
+            { weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 0, exerciseId: 'bench-press', target: '8-12 reps', roundIndex: 0 },
+            { weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 1, exerciseId: 'barbell-row', target: '10-12 reps', roundIndex: 0 },
+            { weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 0, exerciseId: 'bench-press', target: '8-12 reps', roundIndex: 1 },
+            { weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 1, exerciseId: 'barbell-row', target: '10-12 reps', roundIndex: 1 },
+            { weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 0, exerciseId: 'bench-press', target: '8-12 reps', roundIndex: 2 },
+          ],
+          restAfter: [null, 60, null, 60, null],
+        },
+      ],
+    }
+
+    renderWorkout(uneven)
+
+    expect(screen.getByText('Round 1')).toBeInTheDocument()
+    expect(screen.getByText('Round 2')).toBeInTheDocument()
+    expect(screen.getByText('Round 3')).toBeInTheDocument()
+    const benchNames = screen.getAllByText('Bench Press')
+    expect(benchNames.length).toBe(3)
+    const rowNames = screen.getAllByText('Barbell Row')
+    expect(rowNames.length).toBe(2)
+  })
 })
 
 describe('RestRow active state', () => {

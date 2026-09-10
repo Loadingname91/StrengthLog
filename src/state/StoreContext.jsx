@@ -3,6 +3,7 @@ import { reducer, initialSettings, allExercises } from './reducer'
 import { loadState, saveState } from './storage'
 import { todayISO } from '../lib/format'
 import { defaultWeekdayAssignments } from '../lib/schedule'
+import { normalizeBlock } from '../lib/blocks'
 import { useWorkoutNotifications } from './useWorkoutNotifications'
 
 const StoreCtx = createContext(null)
@@ -21,6 +22,13 @@ export function buildInitialState() {
       persisted.reminders = persisted.settings?.notifyReminders
         ? [{ id: 'rem-migrated', seq: 0, enabled: true, mode: 'auto', time: persisted.settings.reminderTime || '18:00', days: [], label: '' }]
         : []
+    }
+    // Migrate any legacy routines/blocks
+    if (Array.isArray(persisted.routines)) {
+      persisted.routines = persisted.routines.map((r) => ({
+        ...r,
+        blocks: Array.isArray(r.blocks) ? r.blocks.map(normalizeBlock) : [],
+      }))
     }
     // Defaults first, persisted second — so any settings key added after a
     // user's first save (e.g. notification prefs) reads as its default

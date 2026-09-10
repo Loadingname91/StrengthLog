@@ -8,19 +8,10 @@ import { BackIcon, ShareIcon, ClockIcon } from '../components/Icons'
 import { exerciseById } from '../lib/exercises'
 import { blockTarget, workoutCtaLabel } from '../lib/format'
 import { topSetSparklinePoints } from '../lib/selectors'
-import { backfillSequence, sequenceSetCount } from '../lib/blocks'
+import { getBlockExercises, getBlockTotalSets, getBlockTotalReps, estimateBlockDurationSeconds } from '../lib/blocks'
 
-// 50s of work assumed per set; a round (superset) costs 50s per exercise in
-// the pair, matching how totalSets/totalReps below already scale by
-// exerciseIds.length for a superset. Rest steps contribute their real duration.
 function estimateDuration(routine) {
-  const seconds = routine.blocks.reduce((sum, block) => {
-    const b = backfillSequence(block)
-    return sum + b.sequence.reduce((s, step) => {
-      if (step.type === 'rest') return s + step.seconds
-      return s + 50 * (b.type === 'superset' ? b.exerciseIds.length : 1)
-    }, 0)
-  }, 0)
+  const seconds = routine.blocks.reduce((sum, block) => sum + estimateBlockDurationSeconds(block), 0)
   return Math.round(seconds / 60)
 }
 
@@ -35,14 +26,15 @@ export default function WorkoutOverview() {
 
   const rows = useMemo(() => {
     if (!routine) return []
-    return routine.blocks.flatMap((block) =>
-      block.exerciseIds.map((exId) => ({
-        exId,
-        name: exerciseById(exId, exercises)?.name || exId,
-        target: blockTarget(block),
-        spark: topSetSparklinePoints(state.sessions, exId, 7),
+    return routine.blocks.flatMap((block) => {
+      const exList = getBlockExercises(block)
+      return exList.map((ex) => ({
+        exId: ex.exerciseId,
+        name: exerciseById(ex.exerciseId, exercises)?.name || ex.exerciseId,
+        target: blockTarget(ex),
+        spark: topSetSparklinePoints(state.sessions, ex.exerciseId, 7),
       }))
-    )
+    })
   }, [routine, state.sessions, exercises])
 
   useEffect(() => {
@@ -51,9 +43,9 @@ export default function WorkoutOverview() {
 
   if (!routine) return null
 
-  const totalSets = routine.blocks.reduce((s, b) => s + sequenceSetCount(backfillSequence(b).sequence) * b.exerciseIds.length, 0)
-  const totalReps = routine.blocks.reduce((s, b) => s + sequenceSetCount(backfillSequence(b).sequence) * Math.round((b.repMin + b.repMax) / 2) * b.exerciseIds.length, 0)
-  const exerciseCount = routine.blocks.reduce((s, b) => s + b.exerciseIds.length, 0)
+  const totalSets = routine.blocks.reduce((s, b) => s + getBlockTotalSets(b), 0)
+  const totalReps = routine.blocks.reduce((s, b) => s + getBlockTotalReps(b), 0)
+  const exerciseCount = routine.blocks.reduce((s, b) => s + (b.exerciseIds?.length || b.exercises?.length || 1), 0)
 
   function start() {
     // A workout for a DIFFERENT routine is already in progress — this is

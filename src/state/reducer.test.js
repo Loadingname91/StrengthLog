@@ -319,6 +319,82 @@ describe('Superset runtime (Phase 6)', () => {
     const afterSecondRemove = reducer(afterOneRemove, { type: 'REMOVE_SET', payload: { exerciseIndex: 0 } })
     expect(afterSecondRemove.activeWorkout.exercises[0].sets).toHaveLength(2) // guard: can't go below one round
   })
+
+  it('supports uneven superset with per-exercise sets and parameters', () => {
+    const unevenRoutine = {
+      id: 'r-uneven',
+      name: 'Uneven Day',
+      position: 'Session 1 of 1',
+      blocks: [
+        {
+          id: 'b-uneven',
+          type: 'superset',
+          exercises: [
+            {
+              exerciseId: 'bench-press',
+              repMin: 6,
+              repMax: 8,
+              rir: 1,
+              targetWeight: 100,
+              sequence: [
+                { type: 'set' },
+                { type: 'rest', seconds: 60 },
+                { type: 'set' },
+                { type: 'rest', seconds: 60 },
+                { type: 'set' },
+              ], // 3 sets
+            },
+            {
+              exerciseId: 'barbell-row',
+              repMin: 10,
+              repMax: 12,
+              rir: 2,
+              targetWeight: 60,
+              sequence: [
+                { type: 'set' },
+                { type: 'rest', seconds: 45 },
+                { type: 'set' },
+              ], // 2 sets
+            },
+          ],
+        },
+      ],
+    }
+
+    const started = reducer(baseState({ routines: [unevenRoutine], routineOrder: [unevenRoutine.id] }), {
+      type: 'START_WORKOUT',
+      payload: { routineId: unevenRoutine.id },
+    })
+
+    const unit = started.activeWorkout.exercises[0]
+    expect(unit.blockType).toBe('superset')
+    expect(unit.exerciseIds).toEqual(['bench-press', 'barbell-row'])
+    // Round 0: Bench, Row. Round 1: Bench, Row. Round 2: Bench. Total = 5 sets.
+    expect(unit.sets).toHaveLength(5)
+    expect(unit.sets.map((s) => s.exerciseIndex)).toEqual([0, 1, 0, 1, 0])
+    expect(unit.sets.map((s) => s.exerciseId)).toEqual([
+      'bench-press',
+      'barbell-row',
+      'bench-press',
+      'barbell-row',
+      'bench-press',
+    ])
+    // Targets are individual:
+    expect(unit.sets[0].targetWeight).toBe(100)
+    expect(unit.sets[1].targetWeight).toBe(60)
+    expect(unit.sets[0].targetRir).toBe(1)
+    expect(unit.sets[1].targetRir).toBe(2)
+
+    // Rest after:
+    // Round 0: set 0 null, set 1 has rest 45s
+    // Round 1: set 2 null, set 3 has rest 60s (since bench has a 3rd set, rest before round 2)
+    // Round 2: set 4 null (last set of the block)
+    expect(unit.restAfter[0]).toBeNull()
+    expect(unit.restAfter[1]).toBe(45)
+    expect(unit.restAfter[2]).toBeNull()
+    expect(unit.restAfter[3]).toBe(60)
+    expect(unit.restAfter[4]).toBeNull()
+  })
 })
 
 describe('REST_ADJUST / REST_SKIP', () => {

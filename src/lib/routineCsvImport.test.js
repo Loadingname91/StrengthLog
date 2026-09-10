@@ -117,6 +117,36 @@ describe('finalizeRoutineImport', () => {
     expect(outcome.routines[0].blocks[0]).toMatchObject({ type: 'superset', exerciseIds: ['bench-press', 'cable-fly'] })
   })
 
+  it('preserves individual sets, reps, and rest for each exercise in a superset', () => {
+    const csv = [
+      'Routine name,Superset group,Exercise name,Sets,Rep min,Rep max,Rest (sec),RIR,Target weight',
+      'Push Day,A,Bench Press,4,6,8,90,1,100',
+      'Push Day,A,Cable Fly,2,12,15,60,2,25',
+    ].join('\n') + '\n'
+    const { headers, rows, mapping } = parse(csv)
+    const candidates = buildRoutineCandidates(headers, rows, mapping, [])
+
+    const outcome = finalizeRoutineImport(candidates, false)
+    const block = outcome.routines[0].blocks[0]
+    expect(block.type).toBe('superset')
+    expect(block.exerciseIds).toEqual(['bench-press', 'cable-fly'])
+    expect(block.exercises).toHaveLength(2)
+    expect(block.exercises[0]).toMatchObject({
+      exerciseId: 'bench-press',
+      repMin: 6,
+      repMax: 8,
+      rir: 1,
+      targetWeight: 100,
+    })
+    expect(block.exercises[1]).toMatchObject({
+      exerciseId: 'cable-fly',
+      repMin: 12,
+      repMax: 15,
+      rir: 2,
+      targetWeight: 25,
+    })
+  })
+
   it('splits rows into separate routines by routine name, preserving file order', () => {
     const csv = 'Routine name,Exercise name,Sets,Rep min,Rep max,Rest (sec)\nPull Day,Barbell Row,3,8,12,90\nPush Day,Bench Press,3,8,12,90\n'
     const { headers, rows, mapping } = parse(csv)
