@@ -13,6 +13,7 @@ import { goalProgress } from '../lib/selectors'
 import { checkNotificationPermission, requestNotificationPermission, checkExactAlarmPermission, openExactAlarmSettings } from '../lib/nativeNotifications'
 import { downloadTextFile } from '../lib/csv'
 import { buildBackupFilename, parseBackup } from '../lib/backup'
+import { reloadApp } from '../lib/reload'
 
 const PERMISSION_LABEL = { granted: 'Allowed', denied: 'Blocked', prompt: 'Not asked yet', 'prompt-with-rationale': 'Not asked yet' }
 const EXACT_LABEL = { granted: 'Allowed', denied: 'Off — reminders may fire late' }
@@ -89,7 +90,7 @@ export default function Settings() {
 
   function applyRestore() {
     saveState(pendingRestore)
-    window.location.reload()
+    reloadApp()
   }
 
   return (

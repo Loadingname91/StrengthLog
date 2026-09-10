@@ -30,6 +30,11 @@ vi.mock('../lib/csv', () => ({
   downloadTextFile: (...args) => downloadTextFileMock(...args),
 }))
 
+const reloadAppMock = vi.fn()
+vi.mock('../lib/reload', () => ({
+  reloadApp: (...args) => reloadAppMock(...args),
+}))
+
 vi.mock('@capacitor/app', () => ({
   App: { addListener: () => Promise.resolve({ remove: () => {} }) },
 }))
@@ -72,6 +77,7 @@ beforeEach(() => {
   saveStateMock.mockClear()
   downloadTextFileMock.mockClear()
   downloadTextFileMock.mockResolvedValue(undefined)
+  reloadAppMock.mockClear()
 })
 
 describe('Settings backup', () => {
@@ -125,10 +131,6 @@ describe('Settings restore', () => {
 
   it('confirming (hold) writes the parsed backup and reloads', async () => {
     vi.useFakeTimers()
-    const reloadMock = vi.fn()
-    const originalLocation = window.location
-    delete window.location
-    window.location = { ...originalLocation, reload: reloadMock }
 
     try {
       renderSettings()
@@ -142,9 +144,8 @@ describe('Settings restore', () => {
       act(() => { vi.advanceTimersByTime(1500) })
 
       expect(saveStateMock).toHaveBeenCalledWith(backup)
-      expect(reloadMock).toHaveBeenCalledTimes(1)
+      expect(reloadAppMock).toHaveBeenCalledTimes(1)
     } finally {
-      window.location = originalLocation
       vi.useRealTimers()
     }
   })
