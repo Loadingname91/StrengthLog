@@ -675,6 +675,47 @@ describe('REST_ADJUST / REST_SKIP', () => {
   })
 })
 
+describe('TOGGLE_SET_DONE does not arm rest on the final set of the workout', () => {
+  // Two single-set blocks, each with an explicit trailing rest in its
+  // sequence — the routine builder now allows authoring exactly this.
+  function twoBlockRoutineWithTrailingRests() {
+    return {
+      id: 'r1',
+      name: 'Push Day',
+      position: 'Session 1 of 1',
+      blocks: [
+        { id: 'block1', type: 'single', exerciseIds: ['bench-press'], repMin: 8, repMax: 12, rir: 2, targetWeight: null, sequence: [{ type: 'set' }, { type: 'rest', seconds: 60 }] },
+        { id: 'block2', type: 'single', exerciseIds: ['barbell-row'], repMin: 8, repMax: 12, rir: 2, targetWeight: null, sequence: [{ type: 'set' }, { type: 'rest', seconds: 60 }] },
+      ],
+    }
+  }
+
+  function markSetDone(exerciseIndex) {
+    const routine = twoBlockRoutineWithTrailingRests()
+    const started = reducer(baseState({ routines: [routine], routineOrder: [routine.id] }), { type: 'START_WORKOUT', payload: { routineId: routine.id } })
+    const aw = started.activeWorkout
+    const exercises = aw.exercises.map((e, i) => (i === exerciseIndex ? { ...e, sets: e.sets.map((s) => ({ ...s, weight: '60', reps: '10' })) } : e))
+    const withValues = { ...started, activeWorkout: { ...aw, exercises } }
+    return reducer(withValues, { type: 'TOGGLE_SET_DONE', payload: { exerciseIndex, setIndex: 0 } })
+  }
+
+  it('does not arm the timer on the final set of the final exercise, even with a trailing rest', () => {
+    const next = markSetDone(1) // last block's only set
+    expect(next.activeWorkout.restUntil).toBeNull()
+    expect(next.activeWorkout.restExerciseIndex).toBeNull()
+    expect(next.activeWorkout.restSetIndex).toBeNull()
+    expect(next.activeWorkout.restTotalSec).toBeNull()
+  })
+
+  it('still arms the timer on the final set of a non-final exercise', () => {
+    const next = markSetDone(0) // first block's only set — a real exercise transition follows
+    expect(next.activeWorkout.restUntil).not.toBeNull()
+    expect(next.activeWorkout.restExerciseIndex).toBe(0)
+    expect(next.activeWorkout.restSetIndex).toBe(0)
+    expect(next.activeWorkout.restTotalSec).toBe(60)
+  })
+})
+
 describe('SET_NOTIF_FALLBACK', () => {
   it('sets the flag on the active workout when a workout is active', () => {
     const routine = sampleRoutine()

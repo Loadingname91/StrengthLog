@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  bestProductForExercise, recomputePRFlags, totalVolume, totalReps, totalSets, muscleSetCounts, exerciseSetCounts,
+  bestProductForExercise, estimateDuration, recomputePRFlags, totalVolume, totalReps, totalSets, muscleSetCounts, exerciseSetCounts,
   recentPRs, recentSessions, dayTallies, weekStreak, exerciseProgress, epley1RM,
 } from './selectors'
 import { localISODate } from './format'
@@ -59,6 +59,45 @@ describe('bestProductForExercise', () => {
 
   it('returns 0 when the exercise has no history', () => {
     expect(bestProductForExercise(sessions, 'never-logged')).toBe(0)
+  })
+})
+
+describe('estimateDuration', () => {
+  function routine(overrides = {}) {
+    return {
+      id: 'r1',
+      blocks: [{ type: 'single', exerciseIds: ['bench-press'], sets: 2, repMin: 8, repMax: 12, rest: 60, rir: 2, targetWeight: null }],
+      ...overrides,
+    }
+  }
+
+  it('falls back to the 50s/set + rest formula when there is no history for this routine', () => {
+    // [set, rest(60), set] -> 50 + 60 + 50 = 160s -> round(160/60) = 3 min
+    expect(estimateDuration(routine(), [])).toBe(3)
+  })
+
+  it('uses the average of past finished sessions for this routine once there is history', () => {
+    const sessions = [
+      session({ id: 's1', date: '2026-01-01', routineId: 'r1', durationSec: 300 }),
+      session({ id: 's2', date: '2026-01-08', routineId: 'r1', durationSec: 300 }),
+    ]
+    expect(estimateDuration(routine(), sessions)).toBe(5)
+  })
+
+  it('ignores CSV-imported sessions (durationSec: 0) when averaging', () => {
+    const sessions = [
+      session({ id: 's1', date: '2026-01-01', routineId: 'r1', durationSec: 300 }),
+      session({ id: 's2', date: '2026-01-08', routineId: 'r1', durationSec: 0 }),
+    ]
+    expect(estimateDuration(routine(), sessions)).toBe(5)
+  })
+
+  it('ignores sessions of a different routine', () => {
+    const sessions = [
+      session({ id: 's1', date: '2026-01-01', routineId: 'r1', durationSec: 300 }),
+      session({ id: 's2', date: '2026-01-08', routineId: 'other-routine', durationSec: 3000 }),
+    ]
+    expect(estimateDuration(routine(), sessions)).toBe(5)
   })
 })
 

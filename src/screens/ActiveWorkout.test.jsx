@@ -422,7 +422,18 @@ describe('ActiveWorkout merged superset (Phase 6)', () => {
   })
 
   it('rest starts only once the round\'s second exercise is also completed', () => {
-    renderWorkout(supersetWorkout())
+    // A trailing exercise follows the superset here specifically so this
+    // round's completion isn't ALSO the final set of the final exercise —
+    // TOGGLE_SET_DONE now deliberately withholds the rest timer for that
+    // case (see the "does not arm rest on the final set" describe block).
+    const workout = supersetWorkout()
+    workout.exercises.push({
+      exerciseId: 'overhead-press', exerciseIds: ['overhead-press'], blockId: 'block2', blockType: 'single',
+      target: '2x8-12', rir: null, targetWeight: null,
+      sets: [{ weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 0 }],
+      restAfter: [null],
+    })
+    renderWorkout(workout)
 
     fireEvent.change(weightInputs()[0], { target: { value: '60' } })
     fireEvent.change(repsInputs()[0], { target: { value: '10' } })

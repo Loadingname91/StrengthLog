@@ -7,13 +7,8 @@ import ConfirmSheet from '../components/ConfirmSheet'
 import { BackIcon, ShareIcon, ClockIcon } from '../components/Icons'
 import { exerciseById } from '../lib/exercises'
 import { blockTarget, workoutCtaLabel } from '../lib/format'
-import { topSetSparklinePoints } from '../lib/selectors'
-import { getBlockExercises, getBlockTotalSets, getBlockTotalReps, estimateBlockDurationSeconds } from '../lib/blocks'
-
-function estimateDuration(routine) {
-  const seconds = routine.blocks.reduce((sum, block) => sum + estimateBlockDurationSeconds(block), 0)
-  return Math.round(seconds / 60)
-}
+import { topSetSparklinePoints, estimateDuration } from '../lib/selectors'
+import { getBlockExercises, getBlockTotalSets, getBlockTotalReps } from '../lib/blocks'
 
 export default function WorkoutOverview() {
   const { id } = useParams()
@@ -66,7 +61,7 @@ export default function WorkoutOverview() {
   }
 
   async function share() {
-    const text = `${routine.name} (${routine.position})\n${exerciseCount} exercises · ${totalSets} sets · ~${estimateDuration(routine)} min\n\n` +
+    const text = `${routine.name} (${routine.position})\n${exerciseCount} exercises · ${totalSets} sets · ~${estimateDuration(routine, state.sessions)} min\n\n` +
       rows.map((r) => `• ${r.name} — ${r.target}`).join('\n')
     if (navigator.share) {
       try { await navigator.share({ title: routine.name, text }) } catch { /* user cancelled */ }
@@ -116,7 +111,7 @@ export default function WorkoutOverview() {
           {/* The estimate describes a fresh run, so it only makes sense before one starts. */}
           {!state.activeWorkout && (
             <span className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ background: 'rgba(255,255,255,0.25)' }}>
-              <ClockIcon size={12} />~{estimateDuration(routine)}m
+              <ClockIcon size={12} />~{estimateDuration(routine, state.sessions)}m
             </span>
           )}
         </button>

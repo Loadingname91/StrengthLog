@@ -385,7 +385,12 @@ export function reducer(state, action) {
       let restSetIndex = aw.restSetIndex
       let restTotalSec = aw.restTotalSec
       const restSeconds = ex.restAfter[setIndex]
-      if (willBeDone && restSeconds != null) {
+      // A trailing rest after the very last set of the very last exercise has
+      // nothing to lead into — the user is about to tap Finish, not train
+      // again. Arming it would start a countdown (and a matching native
+      // alarm) for a rest nobody's taking.
+      const isFinalSetOfWorkout = exerciseIndex === aw.exercises.length - 1 && setIndex === ex.sets.length - 1
+      if (willBeDone && restSeconds != null && !isFinalSetOfWorkout) {
         restUntil = new Date(Date.now() + restSeconds * 1000).toISOString()
         restExerciseIndex = exerciseIndex
         restSetIndex = setIndex

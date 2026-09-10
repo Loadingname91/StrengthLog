@@ -409,9 +409,12 @@ export function BlockEditSheet({ block, restDefault, onCancel, onSave, exercises
     )
   }
 
+  // No automatic trailing rest — a rest step is only ever added when the
+  // user explicitly taps "+ Add rest" (below), so a set added at the end
+  // doesn't leave a pointless rest after it.
   function addSet() {
     updateCurrentEx({
-      sequence: [...currentEx.sequence, { type: 'set' }, { type: 'rest', seconds: restDefault }],
+      sequence: [...currentEx.sequence, { type: 'set' }],
     })
   }
 
@@ -455,14 +458,13 @@ export function BlockEditSheet({ block, restDefault, onCancel, onSave, exercises
     }
     ordinal++
     const nextIsRest = currentEx.sequence[i + 1]?.type === 'rest'
-    const isLastStep = i === currentEx.sequence.length - 1
     return (
       <div key={i}>
         <div className="flex items-center justify-between py-1">
           <span className="text-sm font-semibold">Set {ordinal}</span>
           {!onlyOneStepLeft && <button onClick={() => removeStepAt(i)} className="text-lg" style={{ color: 'var(--danger)' }}>×</button>}
         </div>
-        {!nextIsRest && !isLastStep && (
+        {!nextIsRest && (
           <button onClick={() => addRestAfter(i)} className="text-xs font-semibold" style={{ color: 'var(--accent-dark)' }}>+ Add rest</button>
         )}
       </div>

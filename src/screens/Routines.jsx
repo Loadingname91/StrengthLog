@@ -10,12 +10,7 @@ import { exerciseById } from '../lib/exercises'
 import { uid } from '../lib/id'
 import { weekdayName } from '../lib/schedule'
 import { pushModal, popModal } from '../lib/modalStack'
-import { estimateBlockDurationSeconds } from '../lib/blocks'
-
-function estimateDuration(routine) {
-  const seconds = routine.blocks.reduce((sum, block) => sum + estimateBlockDurationSeconds(block), 0)
-  return Math.round(seconds / 60)
-}
+import { estimateDuration } from '../lib/selectors'
 
 export default function Routines() {
   const { state, dispatch, exercises } = useStore()
@@ -93,7 +88,7 @@ export default function Routines() {
                 <div className="min-w-0 flex-1">
                   <div className="text-[15px] font-semibold">{routine.name}</div>
                   <div className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>
-                    {routine.position} · {exCount} exercises · ~{estimateDuration(routine)} min
+                    {routine.position} · {exCount} exercises · ~{estimateDuration(routine, state.sessions)} min
                   </div>
                 </div>
                 <div className="flex gap-0.5 shrink-0" style={{ opacity: 0.7 }}>
