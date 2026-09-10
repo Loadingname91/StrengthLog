@@ -30,6 +30,7 @@ export function buildInitialState() {
         blocks: Array.isArray(r.blocks) ? r.blocks.map(normalizeBlock) : [],
       }))
     }
+    if (!persisted.exerciseTimerPresets) persisted.exerciseTimerPresets = {}
     // Defaults first, persisted second — so any settings key added after a
     // user's first save (e.g. notification prefs) reads as its default
     // instead of undefined, without a one-off backfill line per key.
@@ -41,6 +42,7 @@ export function buildInitialState() {
     user: { name: 'Athlete' },
     customExercises: [],
     exerciseNotes: {},
+    exerciseTimerPresets: {},
     importPresets: [],
     lastFinishedSession: null,
     routines: [],
