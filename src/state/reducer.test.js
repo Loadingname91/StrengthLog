@@ -133,6 +133,97 @@ describe('FINISH_WORKOUT', () => {
     // Sequence advances to the next routine (wraps via modulo).
     expect(next.sequenceIndex).toBe(1)
   })
+
+  function workoutWithOneSet(setOverrides) {
+    return {
+      id: 'w1',
+      routineId: 'r1',
+      routineName: 'Push Day',
+      startedAt: '2026-01-01T10:00:00.000Z',
+      currentIndex: 0,
+      restUntil: null,
+      restExerciseIndex: null,
+      exercises: [
+        {
+          exerciseId: 'bench-press',
+          exerciseIds: ['bench-press'],
+          blockId: 'block1',
+          blockType: 'single',
+          target: '3x8-12',
+          rir: 2,
+          sets: [{ weight: '', reps: '', rir: null, done: true, isPR: false, exerciseIndex: 0, ...setOverrides }],
+          restAfter: [null],
+        },
+      ],
+    }
+  }
+
+  it('carries durationSec through onto the session entry', () => {
+    const routine = sampleRoutine('r1')
+    const state = baseState({ routines: [routine], routineOrder: [routine.id], activeWorkout: workoutWithOneSet({ weight: '60', reps: '10', durationSec: 45 }) })
+
+    const next = reducer(state, { type: 'FINISH_WORKOUT', payload: { note: '' } })
+
+    expect(next.sessions[0].entries[0].sets[0].durationSec).toBe(45)
+  })
+
+  it('keeps a done, duration-only set (no weight/reps) instead of silently dropping it', () => {
+    const routine = sampleRoutine('r1')
+    const state = baseState({ routines: [routine], routineOrder: [routine.id], activeWorkout: workoutWithOneSet({ durationSec: 60 }) })
+
+    const next = reducer(state, { type: 'FINISH_WORKOUT', payload: { note: '' } })
+
+    expect(next.sessions[0].entries).toHaveLength(1)
+    expect(next.sessions[0].entries[0].sets[0]).toMatchObject({ weight: 0, reps: 0, durationSec: 60 })
+  })
+
+  it('still drops a done set with neither weight/reps nor a duration', () => {
+    const routine = sampleRoutine('r1')
+    const state = baseState({ routines: [routine], routineOrder: [routine.id], activeWorkout: workoutWithOneSet({}) })
+
+    const next = reducer(state, { type: 'FINISH_WORKOUT', payload: { note: '' } })
+
+    expect(next.sessions[0].entries).toHaveLength(0)
+  })
+})
+
+describe('ADD_TIMER_PRESET / REMOVE_TIMER_PRESET', () => {
+  it('adds a preset, sorted ascending', () => {
+    const state = baseState({ exerciseTimerPresets: { plank: [60] } })
+    const next = reducer(state, { type: 'ADD_TIMER_PRESET', payload: { exerciseId: 'plank', seconds: 30 } })
+    expect(next.exerciseTimerPresets.plank).toEqual([30, 60])
+  })
+
+  it('dedupes an already-present seconds value', () => {
+    const state = baseState({ exerciseTimerPresets: { plank: [60] } })
+    const next = reducer(state, { type: 'ADD_TIMER_PRESET', payload: { exerciseId: 'plank', seconds: 60 } })
+    expect(next).toBe(state)
+  })
+
+  it('caps at 4 presets per exercise, dropping the longest', () => {
+    const state = baseState({ exerciseTimerPresets: { plank: [30, 45, 60, 90] } })
+    const next = reducer(state, { type: 'ADD_TIMER_PRESET', payload: { exerciseId: 'plank', seconds: 20 } })
+    expect(next.exerciseTimerPresets.plank).toEqual([20, 30, 45, 60])
+  })
+
+  it('works against state where exerciseTimerPresets is entirely omitted', () => {
+    const state = baseState()
+    delete state.exerciseTimerPresets
+    const next = reducer(state, { type: 'ADD_TIMER_PRESET', payload: { exerciseId: 'plank', seconds: 60 } })
+    expect(next.exerciseTimerPresets.plank).toEqual([60])
+  })
+
+  it('removes a preset', () => {
+    const state = baseState({ exerciseTimerPresets: { plank: [30, 60] } })
+    const next = reducer(state, { type: 'REMOVE_TIMER_PRESET', payload: { exerciseId: 'plank', seconds: 30 } })
+    expect(next.exerciseTimerPresets.plank).toEqual([60])
+  })
+
+  it('deletes the exercise key entirely once its last preset is removed', () => {
+    const state = baseState({ exerciseTimerPresets: { plank: [60] } })
+    const next = reducer(state, { type: 'REMOVE_TIMER_PRESET', payload: { exerciseId: 'plank', seconds: 60 } })
+    expect(next.exerciseTimerPresets).not.toHaveProperty('plank')
+  })
 })
 
 function sessionWithSet(id, date, exerciseId, weight, reps) {
@@ -229,6 +320,128 @@ describe('RESTART_WORKOUT', () => {
   })
 })
 
+describe('SWAP_EXERCISE', () => {
+  function started() {
+    const routine = sampleRoutine()
+    return reducer(baseState({ routines: [routine], routineOrder: [routine.id] }), { type: 'START_WORKOUT', payload: { routineId: routine.id } })
+  }
+
+  it('clears weight/reps/rir/done/isPR but preserves set count and restAfter', () => {
+    const logged = reducer(started(), { type: 'SET_SET_FIELD', payload: { exerciseIndex: 0, setIndex: 0, field: 'weight', value: '60' } })
+    const withDone = reducer(logged, { type: 'SET_SET_FIELD', payload: { exerciseIndex: 0, setIndex: 0, field: 'rir', value: 2 } })
+
+    const swapped = reducer(withDone, { type: 'SWAP_EXERCISE', payload: { exerciseIndex: 0, exerciseId: 'incline-db-press' } })
+
+    const unit = swapped.activeWorkout.exercises[0]
+    expect(unit.sets).toHaveLength(3)
+    expect(unit.restAfter).toEqual(withDone.activeWorkout.exercises[0].restAfter)
+    expect(unit.sets.every((s) => s.weight === '' && s.reps === '' && s.rir === null && !s.done && !s.isPR)).toBe(true)
+  })
+
+  it('updates both exerciseId and exerciseIds, so a session entry logged after the swap is never keyed undefined', () => {
+    const swapped = reducer(started(), { type: 'SWAP_EXERCISE', payload: { exerciseIndex: 0, exerciseId: 'incline-db-press' } })
+    expect(swapped.activeWorkout.exercises[0].exerciseId).toBe('incline-db-press')
+    expect(swapped.activeWorkout.exercises[0].exerciseIds).toEqual(['incline-db-press'])
+
+    const logged = reducer(swapped, { type: 'SET_SET_FIELD', payload: { exerciseIndex: 0, setIndex: 0, field: 'weight', value: '40' } })
+    const withReps = reducer(logged, { type: 'SET_SET_FIELD', payload: { exerciseIndex: 0, setIndex: 0, field: 'reps', value: '10' } })
+    const done = reducer(withReps, { type: 'TOGGLE_SET_DONE', payload: { exerciseIndex: 0, setIndex: 0 } })
+    const finished = reducer(done, { type: 'FINISH_WORKOUT', payload: { note: '' } })
+
+    expect(finished.sessions).toHaveLength(1)
+    expect(finished.sessions[0].entries.every((e) => e.exerciseId !== undefined)).toBe(true)
+    expect(finished.sessions[0].entries[0].exerciseId).toBe('incline-db-press')
+  })
+
+  it('nulls targetWeight; preserves target, rir, and blockId', () => {
+    const withTarget = { ...started() }
+    withTarget.activeWorkout = { ...withTarget.activeWorkout, exercises: [{ ...withTarget.activeWorkout.exercises[0], targetWeight: 60 }] }
+
+    const swapped = reducer(withTarget, { type: 'SWAP_EXERCISE', payload: { exerciseIndex: 0, exerciseId: 'incline-db-press' } })
+
+    const unit = swapped.activeWorkout.exercises[0]
+    expect(unit.targetWeight).toBeNull()
+    expect(unit.target).toBe(withTarget.activeWorkout.exercises[0].target)
+    expect(unit.rir).toBe(withTarget.activeWorkout.exercises[0].rir)
+    expect(unit.blockId).toBe(withTarget.activeWorkout.exercises[0].blockId)
+  })
+
+  it('clears a running rest and lastPR only when they belong to the swapped exercise', () => {
+    const logged = reducer(started(), { type: 'SET_SET_FIELD', payload: { exerciseIndex: 0, setIndex: 0, field: 'weight', value: '60' } })
+    const withReps = reducer(logged, { type: 'SET_SET_FIELD', payload: { exerciseIndex: 0, setIndex: 0, field: 'reps', value: '10' } })
+    const resting = reducer(withReps, { type: 'TOGGLE_SET_DONE', payload: { exerciseIndex: 0, setIndex: 0 } })
+    expect(resting.activeWorkout.restUntil).not.toBeNull()
+    expect(resting.activeWorkout.lastPR).not.toBeNull()
+
+    const swapped = reducer(resting, { type: 'SWAP_EXERCISE', payload: { exerciseIndex: 0, exerciseId: 'incline-db-press' } })
+    expect(swapped.activeWorkout.restUntil).toBeNull()
+    expect(swapped.activeWorkout.restExerciseIndex).toBeNull()
+    expect(swapped.activeWorkout.restSetIndex).toBeNull()
+    expect(swapped.activeWorkout.restTotalSec).toBeNull()
+    expect(swapped.activeWorkout.lastPR).toBeNull()
+  })
+
+  it('is a no-op when swapping to the same exercise already in that slot', () => {
+    const state = started()
+    const next = reducer(state, { type: 'SWAP_EXERCISE', payload: { exerciseIndex: 0, exerciseId: 'bench-press' } })
+    expect(next).toBe(state)
+  })
+
+  it('is a no-op on a superset unit', () => {
+    const routine = supersetRoutine()
+    const state = reducer(baseState({ routines: [routine], routineOrder: [routine.id] }), { type: 'START_WORKOUT', payload: { routineId: routine.id } })
+    const next = reducer(state, { type: 'SWAP_EXERCISE', payload: { exerciseIndex: 0, exerciseId: 'incline-db-press' } })
+    expect(next).toBe(state)
+  })
+
+  it('is a no-op when there is no active workout', () => {
+    const state = baseState()
+    const next = reducer(state, { type: 'SWAP_EXERCISE', payload: { exerciseIndex: 0, exerciseId: 'incline-db-press' } })
+    expect(next).toBe(state)
+  })
+})
+
+describe('ADD_EXERCISE', () => {
+  function started() {
+    const routine = sampleRoutine()
+    return reducer(baseState({ routines: [routine], routineOrder: [routine.id] }), { type: 'START_WORKOUT', payload: { routineId: routine.id } })
+  }
+
+  it('appends a new unit without disturbing the existing ones or positional pointers', () => {
+    const state = started()
+    const firstUnit = state.activeWorkout.exercises[0]
+
+    const next = reducer(state, { type: 'ADD_EXERCISE', payload: { exerciseId: 'incline-db-press' } })
+
+    expect(next.activeWorkout.exercises).toHaveLength(2)
+    expect(next.activeWorkout.exercises[0]).toBe(firstUnit)
+    expect(next.activeWorkout.currentIndex).toBe(state.activeWorkout.currentIndex)
+  })
+
+  it('builds a 3-set unit with matching restAfter length and both id fields set', () => {
+    const next = reducer(started(), { type: 'ADD_EXERCISE', payload: { exerciseId: 'incline-db-press' } })
+    const unit = next.activeWorkout.exercises[1]
+
+    expect(unit.sets).toHaveLength(3)
+    expect(unit.restAfter).toHaveLength(3)
+    expect(unit.target).toBe('3×8-12')
+    expect(unit.exerciseId).toBe('incline-db-press')
+    expect(unit.exerciseIds).toEqual(['incline-db-press'])
+  })
+
+  it('the new unit does not read as already complete', () => {
+    const next = reducer(started(), { type: 'ADD_EXERCISE', payload: { exerciseId: 'incline-db-press' } })
+    const unit = next.activeWorkout.exercises[1]
+    expect(unit.sets.every((s) => s.done)).toBe(false)
+  })
+
+  it('is a no-op when there is no active workout', () => {
+    const state = baseState()
+    const next = reducer(state, { type: 'ADD_EXERCISE', payload: { exerciseId: 'incline-db-press' } })
+    expect(next).toBe(state)
+  })
+})
+
 function supersetRoutine() {
   return {
     id: 'r1',
@@ -318,6 +531,82 @@ describe('Superset runtime (Phase 6)', () => {
 
     const afterSecondRemove = reducer(afterOneRemove, { type: 'REMOVE_SET', payload: { exerciseIndex: 0 } })
     expect(afterSecondRemove.activeWorkout.exercises[0].sets).toHaveLength(2) // guard: can't go below one round
+  })
+
+  it('supports uneven superset with per-exercise sets and parameters', () => {
+    const unevenRoutine = {
+      id: 'r-uneven',
+      name: 'Uneven Day',
+      position: 'Session 1 of 1',
+      blocks: [
+        {
+          id: 'b-uneven',
+          type: 'superset',
+          exercises: [
+            {
+              exerciseId: 'bench-press',
+              repMin: 6,
+              repMax: 8,
+              rir: 1,
+              targetWeight: 100,
+              sequence: [
+                { type: 'set' },
+                { type: 'rest', seconds: 60 },
+                { type: 'set' },
+                { type: 'rest', seconds: 60 },
+                { type: 'set' },
+              ], // 3 sets
+            },
+            {
+              exerciseId: 'barbell-row',
+              repMin: 10,
+              repMax: 12,
+              rir: 2,
+              targetWeight: 60,
+              sequence: [
+                { type: 'set' },
+                { type: 'rest', seconds: 45 },
+                { type: 'set' },
+              ], // 2 sets
+            },
+          ],
+        },
+      ],
+    }
+
+    const started = reducer(baseState({ routines: [unevenRoutine], routineOrder: [unevenRoutine.id] }), {
+      type: 'START_WORKOUT',
+      payload: { routineId: unevenRoutine.id },
+    })
+
+    const unit = started.activeWorkout.exercises[0]
+    expect(unit.blockType).toBe('superset')
+    expect(unit.exerciseIds).toEqual(['bench-press', 'barbell-row'])
+    // Round 0: Bench, Row. Round 1: Bench, Row. Round 2: Bench. Total = 5 sets.
+    expect(unit.sets).toHaveLength(5)
+    expect(unit.sets.map((s) => s.exerciseIndex)).toEqual([0, 1, 0, 1, 0])
+    expect(unit.sets.map((s) => s.exerciseId)).toEqual([
+      'bench-press',
+      'barbell-row',
+      'bench-press',
+      'barbell-row',
+      'bench-press',
+    ])
+    // Targets are individual:
+    expect(unit.sets[0].targetWeight).toBe(100)
+    expect(unit.sets[1].targetWeight).toBe(60)
+    expect(unit.sets[0].targetRir).toBe(1)
+    expect(unit.sets[1].targetRir).toBe(2)
+
+    // Rest after:
+    // Round 0: set 0 null, set 1 has rest 45s
+    // Round 1: set 2 null, set 3 has rest 60s (since bench has a 3rd set, rest before round 2)
+    // Round 2: set 4 null (last set of the block)
+    expect(unit.restAfter[0]).toBeNull()
+    expect(unit.restAfter[1]).toBe(45)
+    expect(unit.restAfter[2]).toBeNull()
+    expect(unit.restAfter[3]).toBe(60)
+    expect(unit.restAfter[4]).toBeNull()
   })
 })
 

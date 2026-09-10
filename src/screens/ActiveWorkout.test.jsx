@@ -3,6 +3,7 @@ import { useSyncExternalStore } from 'react'
 import { render, fireEvent, screen, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { reducer } from '../state/reducer'
+import { EXERCISES } from '../lib/exercises'
 import ActiveWorkout from './ActiveWorkout'
 
 // A minimal external store (subscribe/getState/dispatch) bridging the real
@@ -32,7 +33,7 @@ let testStore
 vi.mock('../state/StoreContext', () => ({
   useStore: () => {
     const state = useSyncExternalStore(testStore.subscribe, testStore.getState)
-    return { state, dispatch: testStore.dispatch }
+    return { state, dispatch: testStore.dispatch, exercises: EXERCISES }
   },
 }))
 
@@ -42,6 +43,7 @@ function baseState(activeWorkout) {
     user: { name: 'Athlete' },
     customExercises: [],
     exerciseNotes: {},
+    exerciseTimerPresets: {},
     importPresets: [],
     lastFinishedSession: null,
     routines: [],
@@ -148,6 +150,32 @@ function threeSetSameRestWorkout() {
   }
 }
 
+function twoExerciseWorkout() {
+  return {
+    id: 'w1',
+    routineId: 'r1',
+    routineName: 'Push Day',
+    startedAt: new Date().toISOString(),
+    currentIndex: 0,
+    restUntil: null,
+    restExerciseIndex: null,
+    exercises: [
+      {
+        exerciseId: 'bench-press', exerciseIds: ['bench-press'], blockId: 'block1', blockType: 'single',
+        target: '2x8-12', rir: null, targetWeight: null,
+        sets: [{ weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 0 }],
+        restAfter: [null],
+      },
+      {
+        exerciseId: 'barbell-row', exerciseIds: ['barbell-row'], blockId: 'block2', blockType: 'single',
+        target: '2x8-12', rir: null, targetWeight: null,
+        sets: [{ weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 0 }],
+        restAfter: [null],
+      },
+    ],
+  }
+}
+
 function renderWorkout(activeWorkout = twoSetWorkout()) {
   testStore = createTestStore(baseState(activeWorkout))
   return render(
@@ -163,6 +191,147 @@ function weightInputs() {
 function repsInputs() {
   return screen.getAllByPlaceholderText('—').filter((el) => el.getAttribute('inputmode') === 'numeric')
 }
+
+describe('vertical exercise list', () => {
+  it('renders every exercise name, not just the current one', () => {
+    renderWorkout(twoExerciseWorkout())
+    expect(screen.getByText('Bench Press')).toBeInTheDocument()
+    expect(screen.getByText('Barbell Row')).toBeInTheDocument()
+  })
+
+  it('only the current unit renders weight/reps inputs', () => {
+    renderWorkout(twoExerciseWorkout())
+    expect(weightInputs()).toHaveLength(1)
+    expect(repsInputs()).toHaveLength(1)
+  })
+
+  it('clicking a later exercise\'s collapsed row expands it and collapses the previous one', () => {
+    renderWorkout(twoExerciseWorkout())
+    expect(testStore.getState().activeWorkout.currentIndex).toBe(0)
+
+    fireEvent.click(screen.getByText('Barbell Row'))
+
+    expect(testStore.getState().activeWorkout.currentIndex).toBe(1)
+    // The expanded card no longer shows a target line for Bench Press —
+    // only its collapsed row remains, proving navigation still works after
+    // the chip strip was replaced.
+    expect(screen.getAllByText('Bench Press')).toHaveLength(1)
+    expect(weightInputs()).toHaveLength(1)
+  })
+
+  it('shows a set-count on a collapsed row and switches to done styling once complete', () => {
+    const workout = twoExerciseWorkout()
+    workout.exercises[1].sets[0] = { ...workout.exercises[1].sets[0], weight: '60', reps: '10', done: true }
+    renderWorkout(workout)
+
+    expect(screen.getByText('1/1 sets')).toBeInTheDocument()
+  })
+})
+
+describe('swap exercise', () => {
+  it('opens the exercise library, and picking a new exercise for an untouched unit swaps immediately', () => {
+    renderWorkout(twoSetWorkout()) // untouched: no weight/reps logged yet
+
+    fireEvent.click(screen.getByText('Swap'))
+    expect(screen.getByText('Exercise Library')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Barbell Row'))
+
+    expect(screen.queryByText('Exercise Library')).not.toBeInTheDocument()
+    expect(testStore.getState().activeWorkout.exercises[0].exerciseId).toBe('barbell-row')
+    expect(weightInputs()[0].value).toBe('')
+  })
+
+  it('shows a confirm sheet instead of swapping immediately once the unit has logged data', () => {
+    renderWorkout(twoSetWorkout())
+    fireEvent.change(weightInputs()[0], { target: { value: '60' } })
+
+    fireEvent.click(screen.getByText('Swap'))
+    fireEvent.click(screen.getByText('Barbell Row'))
+
+    expect(screen.getByText('Swap this exercise?')).toBeInTheDocument()
+    // Not swapped yet — still Bench Press, still holding the typed weight.
+    expect(testStore.getState().activeWorkout.exercises[0].exerciseId).toBe('bench-press')
+
+    // Two "Swap" buttons now exist — the card's own trigger, and the confirm
+    // sheet's confirm button, which renders after it in the tree.
+    fireEvent.click(screen.getAllByText('Swap').at(-1))
+
+    expect(testStore.getState().activeWorkout.exercises[0].exerciseId).toBe('barbell-row')
+    expect(weightInputs()[0].value).toBe('')
+  })
+
+  it('renders no Swap button on a superset card', () => {
+    renderWorkout(supersetWorkout())
+    expect(screen.queryByText('Swap')).not.toBeInTheDocument()
+  })
+})
+
+describe('add exercise', () => {
+  it('appends a new collapsed row after picking, without disturbing the current exercise', () => {
+    renderWorkout(twoSetWorkout())
+
+    fireEvent.click(screen.getByText('+ Add exercise'))
+    expect(screen.getByText('Exercise Library')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Barbell Row'))
+
+    expect(screen.queryByText('Exercise Library')).not.toBeInTheDocument()
+    expect(testStore.getState().activeWorkout.exercises).toHaveLength(2)
+    expect(testStore.getState().activeWorkout.currentIndex).toBe(0)
+    // Still expanded on Bench Press (2 sets, per twoSetWorkout); Barbell Row
+    // shows as a collapsed row, contributing no inputs of its own.
+    expect(weightInputs()).toHaveLength(2)
+    expect(screen.getByText('0/3 sets')).toBeInTheDocument()
+  })
+})
+
+describe('quick timer', () => {
+  it('shows preset chips seeded from exerciseTimerPresets for the targeted exercise', () => {
+    const workout = twoSetWorkout()
+    testStore = createTestStore({ ...baseState(workout), exerciseTimerPresets: { 'bench-press': [30, 60] } })
+    render(
+      <MemoryRouter>
+        <ActiveWorkout />
+      </MemoryRouter>
+    )
+
+    fireEvent.click(screen.getByText('Timer'))
+
+    expect(screen.getByText('30s')).toBeInTheDocument()
+    expect(screen.getByText('60s')).toBeInTheDocument()
+  })
+
+  it('counting a countdown down to completion and logging it sets durationSec, marks the set done, and never arms a rest countdown', () => {
+    vi.useFakeTimers()
+    try {
+      const workout = twoSetWorkout()
+      // Set 0 is already done, so the timer targets set 1 — whose
+      // restAfter is null. Any non-null restUntil afterward could only come
+      // from the sheet's own state, proving it never writes restUntil/
+      // restTotalSec itself (it only ever dispatches SET_SET_FIELD/
+      // TOGGLE_SET_DONE, same as a normal weight/reps completion).
+      workout.exercises[0].sets[0] = { ...workout.exercises[0].sets[0], weight: '60', reps: '10', done: true }
+      testStore = createTestStore({ ...baseState(workout), exerciseTimerPresets: { 'bench-press': [5] } })
+      render(
+        <MemoryRouter>
+          <ActiveWorkout />
+        </MemoryRouter>
+      )
+
+      fireEvent.click(screen.getByText('Timer'))
+      fireEvent.click(screen.getByText('Start'))
+      act(() => { vi.advanceTimersByTime(5000) })
+      fireEvent.click(screen.getByText('Log 5s'))
+
+      const aw = testStore.getState().activeWorkout
+      expect(aw.exercises[0].sets[1].durationSec).toBe(5)
+      expect(aw.exercises[0].sets[1].done).toBe(true)
+      expect(aw.restUntil).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
 
 describe('ActiveWorkout fast set entry', () => {
   it('confirming weight (blur) focuses that set\'s reps field', () => {
@@ -276,6 +445,47 @@ describe('ActiveWorkout merged superset (Phase 6)', () => {
     const aw = testStore.getState().activeWorkout
     expect(aw.restUntil).not.toBeNull()
     expect(aw.restTotalSec).toBe(120)
+  })
+
+  it('renders uneven superset with dynamic exercise counts per round', () => {
+    const uneven = {
+      id: 'w-uneven',
+      routineId: 'r1',
+      routineName: 'Push Day',
+      startedAt: new Date().toISOString(),
+      currentIndex: 0,
+      restUntil: null,
+      restExerciseIndex: null,
+      exercises: [
+        {
+          exerciseIds: ['bench-press', 'barbell-row'],
+          blockId: 'block1',
+          blockType: 'superset',
+          exercises: [
+            { exerciseId: 'bench-press', target: '3x8-12', sequence: [{ type: 'set' }, { type: 'rest', seconds: 60 }, { type: 'set' }, { type: 'rest', seconds: 60 }, { type: 'set' }] },
+            { exerciseId: 'barbell-row', target: '2x10-12', sequence: [{ type: 'set' }, { type: 'rest', seconds: 60 }, { type: 'set' }] },
+          ],
+          sets: [
+            { weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 0, exerciseId: 'bench-press', target: '8-12 reps', roundIndex: 0 },
+            { weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 1, exerciseId: 'barbell-row', target: '10-12 reps', roundIndex: 0 },
+            { weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 0, exerciseId: 'bench-press', target: '8-12 reps', roundIndex: 1 },
+            { weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 1, exerciseId: 'barbell-row', target: '10-12 reps', roundIndex: 1 },
+            { weight: '', reps: '', rir: null, done: false, isPR: false, exerciseIndex: 0, exerciseId: 'bench-press', target: '8-12 reps', roundIndex: 2 },
+          ],
+          restAfter: [null, 60, null, 60, null],
+        },
+      ],
+    }
+
+    renderWorkout(uneven)
+
+    expect(screen.getByText('Round 1')).toBeInTheDocument()
+    expect(screen.getByText('Round 2')).toBeInTheDocument()
+    expect(screen.getByText('Round 3')).toBeInTheDocument()
+    const benchNames = screen.getAllByText('Bench Press')
+    expect(benchNames.length).toBe(3)
+    const rowNames = screen.getAllByText('Barbell Row')
+    expect(rowNames.length).toBe(2)
   })
 })
 

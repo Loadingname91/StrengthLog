@@ -191,6 +191,51 @@ describe('useWorkoutNotifications — PR celebration (effect C)', () => {
     expect(native.notifyPR).toHaveBeenCalledTimes(1)
     expect(native.notifyPR).toHaveBeenCalledWith(expect.objectContaining({ exerciseIndex: 0, setIndex: 0 }))
   })
+
+  it('fires again for a second PR at the same {exerciseIndex,setIndex} after SWAP_EXERCISE clears the slot', () => {
+    // Regression: SWAP_EXERCISE clears a unit's sets, so a genuine new PR on
+    // the swapped-in exercise can land at the exact same coordinate a prior
+    // PR already fired for. Without lastPR.at disambiguating the dedupe key,
+    // firedPrKeyRef would treat it as already-celebrated and stay silent.
+    vi.useFakeTimers()
+    try {
+      const routine = sampleRoutine()
+      const { apply } = renderNotifications(baseState({ routines: [routine], routineOrder: [routine.id] }))
+      apply({ type: 'START_WORKOUT', payload: { routineId: routine.id } })
+      apply({ type: 'SET_SET_FIELD', payload: { exerciseIndex: 0, setIndex: 0, field: 'weight', value: '200' } })
+      apply({ type: 'SET_SET_FIELD', payload: { exerciseIndex: 0, setIndex: 0, field: 'reps', value: '10' } })
+      apply({ type: 'TOGGLE_SET_DONE', payload: { exerciseIndex: 0, setIndex: 0 } })
+      expect(native.notifyPR).toHaveBeenCalledTimes(1)
+
+      vi.advanceTimersByTime(1000)
+      apply({ type: 'SWAP_EXERCISE', payload: { exerciseIndex: 0, exerciseId: 'incline-db-press' } })
+      apply({ type: 'SET_SET_FIELD', payload: { exerciseIndex: 0, setIndex: 0, field: 'weight', value: '40' } })
+      apply({ type: 'SET_SET_FIELD', payload: { exerciseIndex: 0, setIndex: 0, field: 'reps', value: '10' } })
+      apply({ type: 'TOGGLE_SET_DONE', payload: { exerciseIndex: 0, setIndex: 0 } })
+
+      expect(native.notifyPR).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('useWorkoutNotifications — navigation stays in the store (effect B)', () => {
+  it('GOTO_EXERCISE updates the native notification\'s exerciseName and setsTotal', () => {
+    const routine = sampleRoutine()
+    const { apply } = renderNotifications(baseState({ routines: [routine], routineOrder: [routine.id] }))
+    apply({ type: 'START_WORKOUT', payload: { routineId: routine.id } })
+    apply({ type: 'ADD_EXERCISE', payload: { exerciseId: 'incline-db-press' } })
+    native.updateWorkout.mockClear()
+
+    apply({ type: 'GOTO_EXERCISE', payload: 1 })
+
+    // renderNotifications wires an empty exercises catalog, so unitName
+    // falls back to the raw id — still proof enough that the notification
+    // now reflects the newly-current unit (added at index 1), not the
+    // routine's original one.
+    expect(native.updateWorkout).toHaveBeenCalledWith(expect.objectContaining({ exerciseName: 'incline-db-press', setsTotal: 3 }))
+  })
 })
 
 describe('useWorkoutNotifications — reminders (effect D)', () => {

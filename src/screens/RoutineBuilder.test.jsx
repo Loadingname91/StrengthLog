@@ -140,3 +140,58 @@ describe('RoutineBuilder drag gesture', () => {
     expect(row.style.transform).toBe('')
   })
 })
+
+describe('BlockEditSheet superset editing', () => {
+  it('renders exercise tabs and allows editing individual exercise parameters', () => {
+    const onSave = vi.fn()
+    const supersetBlock = {
+      id: 'b-super',
+      type: 'superset',
+      exerciseIds: ['bench-press', 'barbell-row'],
+      exercises: [
+        { exerciseId: 'bench-press', repMin: 8, repMax: 12, sets: 3, rest: 90, rir: 2, targetWeight: 80 },
+        { exerciseId: 'barbell-row', repMin: 10, repMax: 15, sets: 2, rest: 60, rir: null, targetWeight: 50 },
+      ],
+    }
+
+    render(
+      <BlockEditSheet
+        block={supersetBlock}
+        restDefault={90}
+        onCancel={vi.fn()}
+        onSave={onSave}
+        exercises={[
+          { id: 'bench-press', name: 'Bench Press' },
+          { id: 'barbell-row', name: 'Barbell Row' },
+        ]}
+      />
+    )
+
+    // Tabs: "Bench Press (3 sets)" and "Barbell Row (2 sets)".
+    // Use getAllByRole to guard against any stale DOM from prior tests, then
+    // pick the last (most recently rendered) matching button.
+    const benchButtons = screen.getAllByRole('button', { name: /Bench Press/ })
+    const benchTab = benchButtons[benchButtons.length - 1]
+    expect(benchTab).toBeInTheDocument()
+    const rowButtons = screen.getAllByRole('button', { name: /Barbell Row/ })
+    const rowTab = rowButtons[rowButtons.length - 1]
+    expect(rowTab).toBeInTheDocument()
+
+    fireEvent.click(rowTab)
+
+    const weightInput = screen.getByPlaceholderText('e.g. 60')
+    expect(weightInput.value).toBe('50')
+    fireEvent.change(weightInput, { target: { value: '55' } })
+
+    fireEvent.click(screen.getByText('Save superset'))
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+    const saved = onSave.mock.calls[0][0]
+    expect(saved.type).toBe('superset')
+    expect(saved.exercises[0].exerciseId).toBe('bench-press')
+    expect(saved.exercises[0].targetWeight).toBe(80)
+    expect(saved.exercises[1].exerciseId).toBe('barbell-row')
+    expect(saved.exercises[1].targetWeight).toBe(55)
+  })
+})
+

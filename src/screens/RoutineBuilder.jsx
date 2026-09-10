@@ -7,7 +7,7 @@ import { exerciseById } from '../lib/exercises'
 import { blockTarget } from '../lib/format'
 import { uid } from '../lib/id'
 import { pushModal, popModal } from '../lib/modalStack'
-import { backfillSequence, sequenceSetCount, sequenceRestTotal } from '../lib/blocks'
+import { backfillSequence, sequenceSetCount, sequenceRestTotal, normalizeBlock } from '../lib/blocks'
 
 export default function RoutineBuilder() {
   const { id } = useParams()
@@ -59,8 +59,7 @@ export default function RoutineBuilder() {
   const checkedIndices = useMemo(() => [...checked].sort((a, b) => a - b), [checked])
   const canGroup = useMemo(() => {
     if (checkedIndices.length < 2) return false
-    if (!checkedIndices.every((i) => blocks[i]?.type === 'single')) return false
-    return checkedIndices.every((v, i) => i === 0 || v === checkedIndices[i - 1] + 1)
+    return checkedIndices.every((i) => blocks[i]?.type === 'single')
   }, [checkedIndices, blocks])
 
   function toggleChecked(i) {
@@ -73,14 +72,23 @@ export default function RoutineBuilder() {
   }
 
   function groupSuperset() {
-    const [first, ...rest] = checkedIndices
-    const firstBlock = backfillSequence(blocks[first])
-    const mergedSequence = firstBlock.sequence.map((step) => (step.type === 'set' ? { type: 'round' } : step))
+    const [first] = checkedIndices
+    const exercises = checkedIndices.map((i) => {
+      const b = backfillSequence(blocks[i])
+      return {
+        exerciseId: b.exerciseIds[0],
+        repMin: b.repMin,
+        repMax: b.repMax,
+        rir: b.rir,
+        targetWeight: b.targetWeight ?? null,
+        sequence: b.sequence.map((step) => (step.type === 'round' ? { type: 'set' } : step)),
+      }
+    })
     const merged = {
-      ...firstBlock,
+      id: uid('block'),
       type: 'superset',
-      exerciseIds: checkedIndices.flatMap((i) => blocks[i].exerciseIds),
-      sequence: mergedSequence,
+      exerciseIds: exercises.map((e) => e.exerciseId),
+      exercises,
     }
     const next = blocks.filter((_, i) => !checkedIndices.includes(i))
     const insertAt = blocks.slice(0, first).filter((_, i) => !checkedIndices.includes(i)).length
@@ -90,10 +98,31 @@ export default function RoutineBuilder() {
     setSelectMode(false)
   }
 
+  function deleteSelected() {
+    setBlocks((prev) => prev.filter((_, i) => !checked.has(i)))
+    setChecked(new Set())
+    setSelectMode(false)
+  }
+
   function ungroup(blockId) {
     setBlocks((prev) =>
       prev.flatMap((b) => {
         if (b.id !== blockId) return [b]
+        if (b.exercises && b.exercises.length > 0) {
+          return b.exercises.map((ex) => {
+            const exWithSeq = backfillSequence(ex)
+            return {
+              id: uid('block'),
+              type: 'single',
+              exerciseIds: [ex.exerciseId],
+              repMin: ex.repMin,
+              repMax: ex.repMax,
+              rir: ex.rir,
+              targetWeight: ex.targetWeight ?? null,
+              sequence: exWithSeq.sequence.map((step) => (step.type === 'round' ? { type: 'set' } : step)),
+            }
+          })
+        }
         const bb = backfillSequence(b)
         const singleSequence = bb.sequence.map((step) => (step.type === 'round' ? { type: 'set' } : step))
         return b.exerciseIds.map((exId) => ({ ...bb, id: uid('block'), type: 'single', exerciseIds: [exId], sequence: singleSequence }))
@@ -229,14 +258,25 @@ export default function RoutineBuilder() {
           />
         ))}
 
-        {selectMode && canGroup && (
-          <button
-            onClick={groupSuperset}
-            className="rounded-xl border p-2.5 text-[13px] font-semibold"
-            style={{ borderColor: 'var(--accent)', background: 'var(--accent-light)', color: 'var(--accent-dark)' }}
-          >
-            Group as superset ({checkedIndices.length} selected)
-          </button>
+        {selectMode && checkedIndices.length > 0 && (
+          <div className="flex gap-2">
+            {canGroup && (
+              <button
+                onClick={groupSuperset}
+                className="flex-1 rounded-xl border p-2.5 text-[13px] font-semibold"
+                style={{ borderColor: 'var(--accent)', background: 'var(--accent-light)', color: 'var(--accent-dark)' }}
+              >
+                Group ({checkedIndices.length})
+              </button>
+            )}
+            <button
+              onClick={deleteSelected}
+              className="flex-1 rounded-xl border p-2.5 text-[13px] font-semibold"
+              style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}
+            >
+              Delete ({checkedIndices.length})
+            </button>
+          </div>
         )}
 
         <button
@@ -305,7 +345,15 @@ function BlockRow({
       )}
       <div onClick={() => !selectMode && onEdit()} className="min-w-0 flex-1 cursor-pointer">
         <div className="text-sm font-semibold">{names}</div>
-        <div className="mt-0.5 text-[11.5px]" style={{ color: 'var(--muted)' }}>{blockTarget(block)} reps · {sequenceRestTotal(backfillSequence(block).sequence)}s rest{block.rir != null ? ` · ${block.rir} RIR` : ''}</div>
+        {block.type === 'superset' && block.exercises ? (
+          <div className="mt-0.5 text-[11.5px]" style={{ color: 'var(--muted)' }}>
+            {block.exercises.map((e) => `${sequenceSetCount(backfillSequence(e).sequence)}× ${blockTarget(e)}`).join(' + ')}
+          </div>
+        ) : (
+          <div className="mt-0.5 text-[11.5px]" style={{ color: 'var(--muted)' }}>
+            {blockTarget(block)} reps · {sequenceRestTotal(backfillSequence(block).sequence)}s rest{block.rir != null ? ` · ${block.rir} RIR` : ''}
+          </div>
+        )}
       </div>
       {block.type === 'superset' && (
         <span className="rounded-md px-1.5 py-0.5 text-[10.5px] font-bold" style={{ color: 'var(--accent)', background: 'var(--accent-light)' }}>SUPERSET</span>
@@ -328,46 +376,70 @@ function BlockRow({
 }
 
 export function BlockEditSheet({ block, restDefault, onCancel, onSave, exercises }) {
-  const [sequence, setSequence] = useState(() => backfillSequence(block).sequence)
-  const [repMin, setRepMin] = useState(block.repMin)
-  const [repMax, setRepMax] = useState(block.repMax)
-  const [rir, setRir] = useState(block.rir)
-  const [targetWeight, setTargetWeight] = useState(block.targetWeight ?? '')
+  const isSuperset = block.type === 'superset'
+  const normalized = normalizeBlock(block)
 
-  const stepLabel = block.type === 'superset' ? 'Round' : 'Set'
-  const stepType = block.type === 'superset' ? 'round' : 'set'
+  const [subExercises, setSubExercises] = useState(() => {
+    if (isSuperset && normalized.exercises) {
+      return normalized.exercises.map((e) => ({
+        ...e,
+        targetWeight: e.targetWeight ?? '',
+        sequence: [...backfillSequence(e).sequence],
+      }))
+    }
+    const bSeq = backfillSequence(block)
+    return [
+      {
+        exerciseId: block.exerciseIds[0],
+        repMin: block.repMin,
+        repMax: block.repMax,
+        rir: block.rir,
+        targetWeight: block.targetWeight ?? '',
+        sequence: [...bSeq.sequence],
+      },
+    ]
+  })
 
-  function addSetOrRound() {
-    setSequence((prev) => [...prev, { type: stepType }])
+  const [activeTab, setActiveTab] = useState(0)
+  const currentEx = subExercises[activeTab] || subExercises[0]
+
+  function updateCurrentEx(patch) {
+    setSubExercises((prev) =>
+      prev.map((ex, idx) => (idx === activeTab ? { ...ex, ...patch } : ex))
+    )
+  }
+
+  // No automatic trailing rest — a rest step is only ever added when the
+  // user explicitly taps "+ Add rest" (below), so a set added at the end
+  // doesn't leave a pointless rest after it.
+  function addSet() {
+    updateCurrentEx({
+      sequence: [...currentEx.sequence, { type: 'set' }],
+    })
   }
 
   function removeStepAt(index) {
-    setSequence((prev) => {
-      const next = [...prev]
-      // Also remove the immediately-following rest step, if any, to avoid
-      // leaving an orphaned back-to-back rest with nothing to separate.
-      if (next[index].type !== 'rest' && next[index + 1]?.type === 'rest') next.splice(index, 2)
-      else next.splice(index, 1)
-      return next
-    })
+    const next = [...currentEx.sequence]
+    if (next[index].type !== 'rest' && next[index + 1]?.type === 'rest') next.splice(index, 2)
+    else next.splice(index, 1)
+    updateCurrentEx({ sequence: next })
   }
 
   function addRestAfter(index) {
-    setSequence((prev) => {
-      const next = [...prev]
-      next.splice(index + 1, 0, { type: 'rest', seconds: restDefault })
-      return next
-    })
+    const next = [...currentEx.sequence]
+    next.splice(index + 1, 0, { type: 'rest', seconds: restDefault })
+    updateCurrentEx({ sequence: next })
   }
 
   function updateRestSeconds(index, seconds) {
-    setSequence((prev) => prev.map((s, i) => (i === index ? { ...s, seconds } : s)))
+    const next = currentEx.sequence.map((s, i) => (i === index ? { ...s, seconds } : s))
+    updateCurrentEx({ sequence: next })
   }
 
-  const onlyOneStepLeft = sequenceSetCount(sequence) === 1
+  const onlyOneStepLeft = sequenceSetCount(currentEx.sequence) === 1
 
   let ordinal = 0
-  const rows = sequence.map((step, i) => {
+  const rows = currentEx.sequence.map((step, i) => {
     if (step.type === 'rest') {
       return (
         <div key={i} className="flex items-center gap-2 rounded-lg border border-dashed p-2" style={{ borderColor: 'var(--border)', background: 'var(--surface-alt)' }}>
@@ -385,11 +457,11 @@ export function BlockEditSheet({ block, restDefault, onCancel, onSave, exercises
       )
     }
     ordinal++
-    const nextIsRest = sequence[i + 1]?.type === 'rest'
+    const nextIsRest = currentEx.sequence[i + 1]?.type === 'rest'
     return (
       <div key={i}>
         <div className="flex items-center justify-between py-1">
-          <span className="text-sm font-semibold">{stepLabel} {ordinal}</span>
+          <span className="text-sm font-semibold">Set {ordinal}</span>
           {!onlyOneStepLeft && <button onClick={() => removeStepAt(i)} className="text-lg" style={{ color: 'var(--danger)' }}>×</button>}
         </div>
         {!nextIsRest && (
@@ -399,36 +471,121 @@ export function BlockEditSheet({ block, restDefault, onCancel, onSave, exercises
     )
   })
 
+  function handleSave() {
+    if (isSuperset) {
+      const cleaned = subExercises.map((e) => ({
+        ...e,
+        targetWeight: e.targetWeight === '' ? null : Number(e.targetWeight),
+      }))
+      onSave({
+        type: 'superset',
+        exerciseIds: cleaned.map((e) => e.exerciseId),
+        exercises: cleaned,
+      })
+    } else {
+      const e = subExercises[0]
+      onSave({
+        repMin: e.repMin,
+        repMax: e.repMax,
+        rir: e.rir,
+        targetWeight: e.targetWeight === '' ? null : Number(e.targetWeight),
+        sequence: e.sequence,
+      })
+    }
+  }
+
+  const headerTitle = isSuperset
+    ? block.exerciseIds.map((id) => exerciseById(id, exercises)?.name || id).join(' + ')
+    : exerciseById(block.exerciseIds[0], exercises)?.name || block.exerciseIds[0]
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onCancel}>
-      <div className="fade-in mx-auto w-full max-w-[480px] rounded-t-[24px] p-5" style={{ background: 'var(--surface)' }} onClick={(e) => e.stopPropagation()}>
-        <div className="font-serif text-lg font-semibold">{block.exerciseIds.map((id) => exerciseById(id, exercises)?.name || id).join(' + ')}</div>
+      <div className="fade-in mx-auto max-h-[85vh] overflow-y-auto w-full max-w-[480px] rounded-t-[24px] p-5" style={{ background: 'var(--surface)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="font-serif text-lg font-semibold">{headerTitle}</div>
+
+        {isSuperset && (
+          <div className="mt-3 flex gap-2 border-b pb-2" style={{ borderColor: 'var(--border)' }}>
+            {subExercises.map((ex, idx) => {
+              const name = exerciseById(ex.exerciseId, exercises)?.name || ex.exerciseId
+              const isActive = activeTab === idx
+              const setsCount = sequenceSetCount(ex.sequence)
+              return (
+                <button
+                  key={ex.exerciseId}
+                  type="button"
+                  onClick={() => setActiveTab(idx)}
+                  className="rounded-xl px-3 py-1.5 text-xs font-semibold transition"
+                  style={{
+                    background: isActive ? 'var(--accent)' : 'var(--surface-alt)',
+                    color: isActive ? '#fff' : 'var(--muted)',
+                  }}
+                >
+                  {name} ({setsCount} {setsCount === 1 ? 'set' : 'sets'})
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <Field label="Min reps"><input type="number" value={repMin} onChange={(e) => setRepMin(Number(e.target.value))} className="w-full rounded-xl border p-2 text-sm" style={{ borderColor: 'var(--border)' }} /></Field>
-          <Field label="Max reps"><input type="number" value={repMax} onChange={(e) => setRepMax(Number(e.target.value))} className="w-full rounded-xl border p-2 text-sm" style={{ borderColor: 'var(--border)' }} /></Field>
+          <Field label="Min reps">
+            <input
+              type="number"
+              value={currentEx.repMin}
+              onChange={(e) => updateCurrentEx({ repMin: Number(e.target.value) })}
+              className="w-full rounded-xl border p-2 text-sm"
+              style={{ borderColor: 'var(--border)' }}
+            />
+          </Field>
+          <Field label="Max reps">
+            <input
+              type="number"
+              value={currentEx.repMax}
+              onChange={(e) => updateCurrentEx({ repMax: Number(e.target.value) })}
+              className="w-full rounded-xl border p-2 text-sm"
+              style={{ borderColor: 'var(--border)' }}
+            />
+          </Field>
         </div>
+
         <Field label="Sequence">
           <div className="flex flex-col gap-1.5">{rows}</div>
           <button
-            onClick={addSetOrRound}
+            onClick={addSet}
             className="mt-1.5 w-full rounded-xl border border-dashed p-2 text-xs font-semibold"
             style={{ borderColor: 'var(--border)', color: 'var(--accent-dark)' }}
           >
             + Add Set
           </button>
         </Field>
+
         <Field label="RIR target (optional)">
-          <input type="number" value={rir ?? ''} onChange={(e) => setRir(e.target.value === '' ? null : Number(e.target.value))} className="w-full rounded-xl border p-2 text-sm" style={{ borderColor: 'var(--border)' }} />
+          <input
+            type="number"
+            value={currentEx.rir ?? ''}
+            onChange={(e) => updateCurrentEx({ rir: e.target.value === '' ? null : Number(e.target.value) })}
+            className="w-full rounded-xl border p-2 text-sm"
+            style={{ borderColor: 'var(--border)' }}
+          />
         </Field>
+
         <Field label="Target weight (optional)">
-          <input type="number" value={targetWeight} onChange={(e) => setTargetWeight(e.target.value)} placeholder="e.g. 60" className="w-full rounded-xl border p-2 text-sm" style={{ borderColor: 'var(--border)' }} />
+          <input
+            type="number"
+            value={currentEx.targetWeight}
+            onChange={(e) => updateCurrentEx({ targetWeight: e.target.value })}
+            placeholder="e.g. 60"
+            className="w-full rounded-xl border p-2 text-sm"
+            style={{ borderColor: 'var(--border)' }}
+          />
         </Field>
+
         <button
-          onClick={() => onSave({ repMin, repMax, rir, targetWeight: targetWeight === '' ? null : Number(targetWeight), sequence })}
-          className="mt-2 w-full rounded-2xl py-3 text-sm font-semibold text-white"
+          onClick={handleSave}
+          className="mt-3 w-full rounded-2xl py-3 text-sm font-semibold text-white"
           style={{ background: 'var(--accent)' }}
         >
-          Save exercise
+          Save {isSuperset ? 'superset' : 'exercise'}
         </button>
       </div>
     </div>
