@@ -44,7 +44,7 @@ export default function ExerciseDetail() {
 
   return (
     <div className="pb-8">
-      <div className="p-3.5"><button onClick={() => navigate(-1)} className="p-1.5"><BackIcon /></button></div>
+      <div className="px-3.5 pb-3.5 pt-[max(14px,env(safe-area-inset-top))]"><button onClick={() => navigate(-1)} className="p-1.5"><BackIcon /></button></div>
 
       <div className="px-5">
         <div className="font-serif text-[22px] font-semibold">{ex.name}</div>
@@ -61,7 +61,7 @@ export default function ExerciseDetail() {
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Last session</div>
                 <div className="tabular-nums font-serif mt-0.5 text-[26px] font-bold leading-none">
-                  {progress.latest.weight}kg × {progress.latest.reps}
+                  {progress.latest.weight}{state.settings.units} × {progress.latest.reps}
                 </div>
               </div>
               {progress.weightDelta != null && progress.weightDelta !== 0 && (
@@ -72,16 +72,16 @@ export default function ExerciseDetail() {
                     color: progress.weightDelta > 0 ? 'var(--accent-dark)' : 'var(--muted)',
                   }}
                 >
-                  {progress.weightDelta > 0 ? '+' : ''}{progress.weightDelta}kg vs last
+                  {progress.weightDelta > 0 ? '+' : ''}{progress.weightDelta}{state.settings.units} vs last
                 </span>
               )}
             </div>
             <div className="mt-3 flex gap-4 text-[12px]" style={{ color: 'var(--muted)' }}>
-              <span>Est. 1RM <b className="tabular-nums" style={{ color: 'var(--text)' }}>{progress.e1rm}kg</b></span>
+              <span>Est. 1RM <b className="tabular-nums" style={{ color: 'var(--text)' }}>{progress.e1rm}{state.settings.units}</b></span>
               {progress.e1rmTotalDelta != null && (
                 <span>
                   {progress.e1rmTotalDelta > 0 ? '+' : ''}
-                  <b className="tabular-nums" style={{ color: 'var(--text)' }}>{progress.e1rmTotalDelta}kg</b>
+                  <b className="tabular-nums" style={{ color: 'var(--text)' }}>{progress.e1rmTotalDelta}{state.settings.units}</b>
                   {' '}over {progress.weeks} week{progress.weeks === 1 ? '' : 's'}
                 </span>
               )}
@@ -110,7 +110,7 @@ export default function ExerciseDetail() {
           {prTable.map((pr) => (
             <div key={pr.reps} className="flex justify-between border-b p-3 text-[13px] last:border-0" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
               <span style={{ color: 'var(--muted)' }}>Best @ {pr.reps} reps</span>
-              <span className="tabular-nums font-semibold">{pr.weight || '—'}{pr.weight ? 'kg' : ''}</span>
+              <span className="tabular-nums font-semibold">{pr.weight || '—'}{pr.weight ? state.settings.units : ''}</span>
             </div>
           ))}
         </div>

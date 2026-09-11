@@ -28,7 +28,7 @@ export default function StatsHub() {
 
   return (
     <div className="pb-4">
-      <div className="px-5 pb-2 pt-5">
+      <div className="px-5 pb-2 pt-[max(20px,env(safe-area-inset-top))]">
         <div className="font-serif text-[22px] font-semibold">Stats</div>
       </div>
       <div className="no-scrollbar flex gap-1.5 overflow-x-auto px-5 pb-3">
@@ -92,7 +92,7 @@ function OverviewTab() {
           <StatTile label="Exercises" value={perWorkout.exercises} />
           <StatTile label="Sets" value={perWorkout.sets} />
           <StatTile label="Reps" value={perWorkout.reps} />
-          <StatTile label="Volume (kg)" value={perWorkout.volume} />
+          <StatTile label={`Volume (${state.settings.units})`} value={perWorkout.volume} />
           <StatTile label="Duration (min)" value={perWorkout.duration} />
         </div>
       </div>
@@ -102,7 +102,7 @@ function OverviewTab() {
         <div className="grid grid-cols-3 gap-2">
           <StatTile label="Workouts" value={weekly.workouts} />
           <StatTile label="Sets" value={weekly.sets} />
-          <StatTile label="Volume (kg)" value={weekly.volume} />
+          <StatTile label={`Volume (${state.settings.units})`} value={weekly.volume} />
         </div>
       </div>
     </div>
@@ -284,7 +284,7 @@ function LogTab() {
                     >
                       <div>
                         <div className="text-sm font-semibold">{session.routineName}</div>
-                        <div className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>{fmtDate(session.date)} · {totalSets(session)} sets · {session.volume}kg</div>
+                        <div className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>{fmtDate(session.date)} · {totalSets(session)} sets · {session.volume}{state.settings.units}</div>
                       </div>
                       <ChevronRightIcon size={16} style={{ color: 'var(--muted)' }} />
                     </div>

@@ -21,7 +21,7 @@ export default function ExportInsights() {
     return sessionsInRange(state.sessions, new Date(from), new Date(to || todayISO()))
   }, [state.sessions, from, to])
 
-  const insights = useMemo(() => buildInsights(inRange, exercises), [inRange, exercises])
+  const insights = useMemo(() => buildInsights(inRange, exercises, state.settings.units), [inRange, exercises, state.settings.units])
   const hasData = inRange.length > 0
 
   function exportCSV() {
@@ -44,7 +44,7 @@ export default function ExportInsights() {
 
   return (
     <div className="pb-8">
-      <div className="p-3.5"><button onClick={() => navigate('/settings')} className="p-1.5"><BackIcon /></button></div>
+      <div className="px-3.5 pb-3.5 pt-[max(14px,env(safe-area-inset-top))]"><button onClick={() => navigate('/settings')} className="p-1.5"><BackIcon /></button></div>
       <div className="font-serif px-5 text-[22px] font-semibold">Export & Insights</div>
 
       <div className="flex gap-2 px-5 pt-3.5">

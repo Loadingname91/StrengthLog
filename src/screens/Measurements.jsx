@@ -37,7 +37,7 @@ export default function Measurements() {
 
   return (
     <div className="pb-8">
-      <div className="p-3.5"><button onClick={() => navigate(-1)} className="p-1.5"><BackIcon /></button></div>
+      <div className="px-3.5 pb-3.5 pt-[max(14px,env(safe-area-inset-top))]"><button onClick={() => navigate(-1)} className="p-1.5"><BackIcon /></button></div>
       <div className="font-serif px-5 text-[22px] font-semibold">Measurements</div>
 
       {waistDelta != null && (
