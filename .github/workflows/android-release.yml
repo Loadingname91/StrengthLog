@@ -77,7 +77,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event_name == 'pull_request' && steps.pr_tag.outputs.tag || github.ref_name }}
-          name: ${{ github.event_name == 'pull_request' && format('PR #{0} build', github.event.pull_request.number) || github.ref_name }}
+          name: "${{ github.event_name == 'pull_request' && format('PR #{0} build', github.event.pull_request.number) || github.ref_name }}"
           prerelease: ${{ github.event_name == 'pull_request' }}
           files: FitLog-debug.apk
           generate_release_notes: true
