@@ -86,19 +86,22 @@ export function chartSeries(sessions, metric, days, exerciseId) {
     const daySessions = inRange.filter((s) => s.date === iso)
     let value = 0
     if (metric === 'workouts') value = daySessions.length
-    else if (metric === 'volume') value = daySessions.reduce((sum, s) => sum + s.volume, 0)
+    else if (metric === 'sets') value = daySessions.reduce((sum, s) => sum + totalSets(s), 0)
     else if (metric === 'exercise' && exerciseId) {
-      value = Math.max(0, ...daySessions.flatMap((s) => topSetFor(s, exerciseId)))
+      value = Math.max(0, ...daySessions.flatMap((s) => topE1RMFor(s, exerciseId)))
     }
     out.push({ date: iso, value })
   }
   return out
 }
 
-function topSetFor(session, exerciseId) {
+// Best estimated 1RM (Epley) rather than raw top weight: a heavier set at
+// fewer reps and a lighter set at more reps aren't comparable as numbers,
+// but their e1RM is — so the trend line reflects strength, not just load.
+function topE1RMFor(session, exerciseId) {
   const entry = session.entries.find((e) => e.exerciseId === exerciseId)
   if (!entry) return [0]
-  return entry.sets.map((s) => s.weight)
+  return entry.sets.map((s) => epley1RM(s.weight, s.reps))
 }
 
 export function toPolyline(series, width, height, pad = 4) {

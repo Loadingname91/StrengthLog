@@ -73,7 +73,7 @@ export default function WorkoutOverview() {
 
   return (
     <div className="pb-6">
-      <div className="flex justify-between px-4 pt-4">
+      <div className="flex justify-between px-4 pt-[max(16px,env(safe-area-inset-top))]">
         <button onClick={() => navigate('/routines')} className="p-1.5"><BackIcon /></button>
         <button onClick={share} className="p-1.5"><ShareIcon /></button>
       </div>

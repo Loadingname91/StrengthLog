@@ -21,7 +21,7 @@ export default function WorkoutSummary() {
   }
 
   return (
-    <div className="px-6 py-7 text-center">
+    <div className="px-6 pb-7 pt-[max(28px,env(safe-area-inset-top))] text-center">
       <div className="text-4xl">🎉</div>
       <div className="font-serif mt-2 text-2xl font-semibold">Workout complete</div>
       <div className="mt-1 text-[13px]" style={{ color: 'var(--muted)' }}>

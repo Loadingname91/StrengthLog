@@ -8,7 +8,7 @@ function topSet(sets) {
 
 // Plain-language callouts generated straight from logged numbers — no
 // external model call, just arithmetic over exerciseHistory/session data.
-export function buildInsights(sessions, exercises) {
+export function buildInsights(sessions, exercises, units = 'kg') {
   const insights = []
   const counts = exerciseSetCounts(sessions)
   const trackedIds = Object.keys(counts).filter((id) => counts[id] >= 4)
@@ -28,7 +28,7 @@ export function buildInsights(sessions, exercises) {
     if (delta >= 2) {
       gains.push({
         exerciseId: id,
-        text: `${ex.name}: +${delta}kg over ${weeks} week${weeks === 1 ? '' : 's'}, on pace.`,
+        text: `${ex.name}: +${delta}${units} over ${weeks} week${weeks === 1 ? '' : 's'}, on pace.`,
       })
     } else {
       const recent = hist.slice(-3)
@@ -37,7 +37,7 @@ export function buildInsights(sessions, exercises) {
       if (flat) {
         stalls.push({
           exerciseId: id,
-          text: `${ex.name} has been flat at ${recentTops[0]}kg for ${recent.length} sessions.`,
+          text: `${ex.name} has been flat at ${recentTops[0]}${units} for ${recent.length} sessions.`,
         })
       }
     }

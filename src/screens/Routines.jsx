@@ -51,7 +51,7 @@ export default function Routines() {
 
   return (
     <div className="pb-4">
-      <div className="flex items-center justify-between px-5 pb-2 pt-5">
+      <div className="flex items-center justify-between px-5 pb-2 pt-[max(20px,env(safe-area-inset-top))]">
         <div className="font-serif text-[22px] font-semibold">Routines</div>
         <SegmentedControl
           value={state.routineMode}

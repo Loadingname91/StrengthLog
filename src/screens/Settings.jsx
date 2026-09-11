@@ -95,7 +95,7 @@ export default function Settings() {
 
   return (
     <div className="pb-6">
-      <div className="font-serif px-5 pb-2 pt-5 text-[22px] font-semibold">Settings</div>
+      <div className="font-serif px-5 pb-2 pt-[max(20px,env(safe-area-inset-top))] text-[22px] font-semibold">Settings</div>
 
       <div className="px-5 pt-2">
         <Card>

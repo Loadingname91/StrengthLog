@@ -34,7 +34,7 @@ function session(overrides = {}) {
 
 // Today is patched via a fixed system time so "current month" is deterministic.
 function renderLog(sessions) {
-  mockState = { sessions, routines: [{ id: 'r1', name: 'Push Day' }] }
+  mockState = { sessions, routines: [{ id: 'r1', name: 'Push Day' }], settings: { units: 'kg' } }
   return render(
     <MemoryRouter>
       <StatsHub />

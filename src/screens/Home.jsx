@@ -61,7 +61,7 @@ export default function Home() {
 
   return (
     <div className="pb-4">
-      <div className="flex items-center justify-between px-5 pb-1 pt-5">
+      <div className="flex items-center justify-between px-5 pb-1 pt-[max(20px,env(safe-area-inset-top))]">
         <div className="flex min-w-0 items-center gap-2.5">
           <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full text-[15px] font-semibold text-white" style={{ background: 'var(--accent)' }}>
             {state.user.name[0]}
@@ -165,7 +165,7 @@ export default function Home() {
       ) : (
         <>
           <div className="px-5 pt-6">
-            <RecentWorkoutsCard session={mostRecent} totalCount={state.sessions.length} onClick={() => navigate('/stats/log')} />
+            <RecentWorkoutsCard session={mostRecent} totalCount={state.sessions.length} units={state.settings.units} onClick={() => navigate('/stats/log')} />
           </div>
 
           <div className="px-5 pt-6">
@@ -174,7 +174,7 @@ export default function Home() {
               <div className="grid grid-cols-3 gap-2">
                 <WeekStat label="Workouts" value={thisWeek.workouts} pct={thisWeek.hasBaseline ? thisWeek.workoutsPct : null} />
                 <WeekStat label="Sets" value={thisWeek.sets} pct={thisWeek.hasBaseline ? thisWeek.setsPct : null} />
-                <WeekStat label="Volume" value={`${thisWeek.volume.toLocaleString()}kg`} pct={thisWeek.hasBaseline ? thisWeek.volumePct : null} />
+                <WeekStat label="Volume" value={`${thisWeek.volume.toLocaleString()}${state.settings.units}`} pct={thisWeek.hasBaseline ? thisWeek.volumePct : null} />
               </div>
               {thisWeek.hasBaseline && (
                 <div className="mt-2.5 text-[11px]" style={{ color: 'var(--muted)' }}>
@@ -192,8 +192,8 @@ export default function Home() {
                 onChange={setMetric}
                 options={[
                   { value: 'workouts', label: 'Workouts' },
-                  { value: 'volume', label: 'Volume' },
-                  { value: 'exercise', label: 'Top lift' },
+                  { value: 'sets', label: 'Sets' },
+                  { value: 'exercise', label: 'Strength' },
                 ]}
               />
             </div>
@@ -210,9 +210,10 @@ export default function Home() {
               </select>
             )}
             <Card>
-              {/* Workout counts are small discrete integers — bars read them
-                  honestly, a line implies a continuum between rest days. */}
-              <LineChart series={series} mode={metric === 'workouts' ? 'bar' : 'line'} />
+              {/* Workouts and sets are small discrete integers — bars read
+                  them honestly, a line implies a continuum between rest days.
+                  Strength (e1RM) is a continuous trend, so it stays a line. */}
+              <LineChart series={series} mode={metric === 'exercise' ? 'line' : 'bar'} />
               <div className="mt-1 flex justify-between text-[11px]" style={{ color: 'var(--muted)' }}>
                 <span>{rangeDays} days ago</span><span>Today</span>
               </div>
@@ -263,7 +264,7 @@ export default function Home() {
                       <div className="text-[11px]" style={{ color: 'var(--muted)' }}>{fmtDate(pr.date)}</div>
                     </div>
                     <span className="tabular-nums shrink-0 rounded-full px-2.5 py-1 text-[12px] font-bold" style={{ background: 'var(--accent-light)', color: 'var(--accent-dark)' }}>
-                      🏆 {pr.weight}kg × {pr.reps}
+                      🏆 {pr.weight}{state.settings.units} × {pr.reps}
                     </span>
                   </div>
                 ))}
@@ -312,7 +313,7 @@ function WeekStat({ label, value, pct }) {
 // Two offset, faded bordered layers behind the real Card read as a peeking
 // stack of past workouts (pure CSS, no library) — the primary, discoverable
 // entry point into workout history, replacing the old header calendar icon.
-function RecentWorkoutsCard({ session, totalCount, onClick }) {
+function RecentWorkoutsCard({ session, totalCount, units, onClick }) {
   return (
     <div className="relative cursor-pointer pb-2 pr-2" onClick={onClick}>
       <div className="absolute inset-0 translate-x-2 translate-y-2 rounded-[20px] border" style={{ background: 'var(--surface-alt)', borderColor: 'var(--border)', opacity: 0.5 }} />
@@ -323,7 +324,7 @@ function RecentWorkoutsCard({ session, totalCount, onClick }) {
             <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--accent)' }}>Recent workout</div>
             <div className="font-serif mt-1 truncate text-[17px] font-semibold">{session.routineName}</div>
             <div className="mt-0.5 text-[13px]" style={{ color: 'var(--muted)' }}>
-              {fmtDate(session.date)} · {totalSets(session)} sets · {session.volume}kg
+              {fmtDate(session.date)} · {totalSets(session)} sets · {session.volume}{units}
             </div>
           </div>
           <ChevronRightIcon size={18} style={{ color: 'var(--muted)' }} />

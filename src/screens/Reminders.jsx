@@ -45,7 +45,7 @@ export default function Reminders() {
 
   return (
     <div className="pb-8">
-      <div className="p-3.5"><button onClick={() => navigate('/settings')} className="p-1.5"><BackIcon /></button></div>
+      <div className="px-3.5 pb-3.5 pt-[max(14px,env(safe-area-inset-top))]"><button onClick={() => navigate('/settings')} className="p-1.5"><BackIcon /></button></div>
       <div className="font-serif px-5 text-[22px] font-semibold">Reminders</div>
       <div className="px-5 pt-1 text-xs" style={{ color: 'var(--muted)' }}>
         Follow your workout schedule automatically, or set alarm-style reminders on your own days.

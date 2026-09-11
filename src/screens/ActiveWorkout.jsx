@@ -139,7 +139,7 @@ export default function ActiveWorkout() {
   return (
     <div className="relative flex h-screen flex-col">
       <div className="flex-1 overflow-auto pb-24">
-        <div className="relative px-[18px] pb-2 pt-3.5">
+        <div className="relative px-[18px] pb-2 pt-[max(14px,env(safe-area-inset-top))]">
           <div className="flex items-center justify-between gap-2">
             <button onClick={() => navigate('/routines')} className="-ml-1.5 shrink-0 p-1.5"><BackIcon /></button>
             <div className="min-w-0 flex-1 truncate text-center text-[15px] font-semibold">{aw.routineName}</div>

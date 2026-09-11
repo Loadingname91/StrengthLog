@@ -54,7 +54,7 @@ export default function SessionDetail() {
 
   return (
     <div className="pb-6">
-      <div className="relative flex items-center justify-between px-4 pt-4">
+      <div className="relative flex items-center justify-between px-4 pt-[max(16px,env(safe-area-inset-top))]">
         <button onClick={() => navigate(-1)} className="p-1.5"><BackIcon /></button>
         <div className="min-w-0 flex-1 truncate text-center text-[15px] font-semibold">{session.routineName}</div>
         <button onClick={() => setMenuOpen((v) => !v)} className="shrink-0 px-1.5 text-lg" style={{ color: 'var(--muted)' }}>⋮</button>
@@ -88,7 +88,7 @@ export default function SessionDetail() {
       </div>
 
       <div className="flex justify-center gap-4 px-5 pb-1 pt-4">
-        <Stat label="Volume (kg)" value={session.volume} />
+        <Stat label={`Volume (${state.settings.units})`} value={session.volume} />
         <Stat label="Sets" value={totalSets(session)} />
         <Stat label="PRs" value={session.prCount} accent={session.prCount > 0} />
       </div>
@@ -110,7 +110,7 @@ export default function SessionDetail() {
                     <span className="tabular-nums font-semibold">
                       {set.weight === 0 && set.reps === 0 && set.durationSec != null
                         ? `${set.durationSec}s`
-                        : `${set.weight}kg × ${set.reps}${set.durationSec != null ? ` · ${set.durationSec}s` : ''}`}
+                        : `${set.weight}${state.settings.units} × ${set.reps}${set.durationSec != null ? ` · ${set.durationSec}s` : ''}`}
                     </span>
                     {set.isPR && <span title="PR">🏆</span>}
                   </div>

@@ -206,7 +206,7 @@ export default function RoutineBuilder() {
 
   return (
     <div className="pb-6">
-      <div className="flex items-center justify-between p-3.5">
+      <div className="flex items-center justify-between px-3.5 pb-3.5 pt-[max(14px,env(safe-area-inset-top))]">
         <button onClick={() => navigate('/routines')} className="p-1.5"><BackIcon /></button>
         <span className="text-[15px] font-semibold">{editing ? 'Edit Routine' : 'New Routine'}</span>
         <button
