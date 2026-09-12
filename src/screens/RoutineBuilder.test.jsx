@@ -18,6 +18,7 @@ vi.mock('../state/StoreContext', () => ({
           position: 'Session 1 of 1',
           blocks: [
             { id: 'b1', type: 'single', exerciseIds: ['bench-press'], sets: 3, repMin: 8, repMax: 12, rest: 90, rir: 2, targetWeight: null },
+            { id: 'b2', type: 'single', exerciseIds: ['barbell-row'], sets: 3, repMin: 8, repMax: 12, rest: 90, rir: 2, targetWeight: null },
           ],
         },
       ],
@@ -129,7 +130,7 @@ describe('RoutineBuilder drag gesture', () => {
   it('aborts an in-progress drag when the window loses focus (backgrounding)', () => {
     render(<RoutineBuilder />)
 
-    const grip = screen.getByLabelText('Drag to reorder')
+    const grip = screen.getAllByLabelText('Drag to reorder')[0]
     fireEvent.pointerDown(grip, { pointerId: 1, clientY: 100 })
 
     const row = grip.closest('div')
@@ -138,6 +139,33 @@ describe('RoutineBuilder drag gesture', () => {
     fireEvent(window, new Event('blur'))
 
     expect(row.style.transform).toBe('')
+  })
+
+  it('swaps past a taller row using that row\'s own measured height, not the dragged row\'s', () => {
+    render(<RoutineBuilder />)
+    const grips = screen.getAllByLabelText('Drag to reorder')
+    const rows = grips.map((g) => g.closest('div'))
+
+    // Row 0 ("b1") is short (40px); row 1 ("b2") is tall (80px). Dragging b1
+    // down should only swap once the pointer clears half of b2's own
+    // height (40px) — with the old fixed-height formula (which used the
+    // dragged row's own 40px for every comparison), a 41px move would have
+    // wrongly triggered the swap already at its own half-height (20px).
+    vi.spyOn(rows[0], 'getBoundingClientRect').mockReturnValue({ top: 0, height: 40 })
+    vi.spyOn(rows[1], 'getBoundingClientRect').mockReturnValue({ top: 48, height: 80 })
+
+    fireEvent.pointerDown(grips[0], { pointerId: 1, clientY: 0 })
+
+    // 30px clears b1's own half-height (20) but not half of b2's real
+    // height (40) — must NOT have swapped yet.
+    fireEvent.pointerMove(grips[0], { pointerId: 1, clientY: 30 })
+    expect(screen.getAllByLabelText('Drag to reorder')[0]).toBe(grips[0])
+
+    // 45px clears half of b2's real 80px height — now it should swap.
+    fireEvent.pointerMove(grips[0], { pointerId: 1, clientY: 45 })
+    const namesAfter = screen.getAllByText(/Bench Press|Barbell Row/).map((el) => el.textContent)
+    expect(namesAfter[0]).toBe('Barbell Row')
+    expect(namesAfter[1]).toBe('Bench Press')
   })
 })
 
