@@ -140,8 +140,20 @@ export default function RoutineBuilder() {
     e.stopPropagation()
     const el = rowRefs.current[block.id]
     if (!el) return
-    const height = el.getBoundingClientRect().height + 8
-    dragInfo.current = { id: block.id, pointerId: e.pointerId, startY: e.clientY, startIndex: index, currentIndex: index, height, el }
+    // One measured height per row, in `blocks`' original order and never
+    // mutated for the rest of the gesture — a superset's multi-line label
+    // is taller than a single exercise's, so a single shared height (the
+    // old approach) mistimed every swap once the list held a mix of both,
+    // leaving a row stuck overlapping its neighbor. Kept fixed (rather than
+    // reordered alongside `blocks`) so the target index below is always
+    // recomputed fresh from the same reference points — a raw offset from
+    // the current index would double-count already-consumed height the
+    // moment the finger reverses direction mid-drag.
+    const heights = blocks.map((b) => {
+      const r = rowRefs.current[b.id]
+      return (r ? r.getBoundingClientRect().height : el.getBoundingClientRect().height) + 8
+    })
+    dragInfo.current = { id: block.id, pointerId: e.pointerId, startY: e.clientY, startIndex: index, currentIndex: index, heights, el }
     try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
     if (navigator.vibrate) navigator.vibrate(10)
     setDragId(block.id)
@@ -153,20 +165,45 @@ export default function RoutineBuilder() {
     if (!info || info.pointerId !== e.pointerId) return
     e.preventDefault()
     const delta = e.clientY - info.startY
-    const shift = Math.round(delta / info.height)
-    const targetIndex = Math.min(blocks.length - 1, Math.max(0, info.startIndex + shift))
-    // Compensate for the row's already-applied DOM shift so the transform
-    // only carries the leftover distance to the finger, keeping it snapped
-    // under the pointer instead of jumping on every swap.
-    setDragY(delta - (targetIndex - info.startIndex) * info.height)
-    if (targetIndex !== info.currentIndex) {
+
+    // Walk outward from the row's ORIGINAL slot (not wherever it ended up
+    // last event), consuming each neighbor's own measured height until the
+    // remaining distance no longer clears that neighbor's halfway point.
+    // Recomputing from the fixed start every time (rather than continuing
+    // from the last computed index) keeps this correct when the finger
+    // reverses direction mid-drag.
+    let idx = info.startIndex
+    let remaining = delta
+    if (delta > 0) {
+      while (idx < info.heights.length - 1) {
+        const h = info.heights[idx + 1]
+        if (remaining < h / 2) break
+        remaining -= h
+        idx++
+      }
+    } else if (delta < 0) {
+      while (idx > 0) {
+        const h = info.heights[idx - 1]
+        if (-remaining < h / 2) break
+        remaining += h
+        idx--
+      }
+    }
+
+    // The leftover distance is what still carries the dragged row's
+    // transform toward the finger, after accounting for whichever slots it
+    // has swapped past.
+    setDragY(remaining)
+
+    if (idx !== info.currentIndex) {
+      const from = info.currentIndex
       setBlocks((prev) => {
         const next = [...prev]
-        const [moved] = next.splice(info.currentIndex, 1)
-        next.splice(targetIndex, 0, moved)
+        const [moved] = next.splice(from, 1)
+        next.splice(idx, 0, moved)
         return next
       })
-      info.currentIndex = targetIndex
+      info.currentIndex = idx
     }
   }
 

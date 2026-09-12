@@ -716,6 +716,60 @@ describe('TOGGLE_SET_DONE does not arm rest on the final set of the workout', ()
   })
 })
 
+describe('TOGGLE_SET_DONE auto-advances currentIndex once the active exercise is fully logged', () => {
+  function threeBlockRoutine() {
+    return {
+      id: 'r1',
+      name: 'Push Day',
+      position: 'Session 1 of 1',
+      blocks: [
+        { id: 'block1', type: 'single', exerciseIds: ['bench-press'], repMin: 8, repMax: 12, rir: 2, targetWeight: null, sequence: [{ type: 'set' }] },
+        { id: 'block2', type: 'single', exerciseIds: ['barbell-row'], repMin: 8, repMax: 12, rir: 2, targetWeight: null, sequence: [{ type: 'set' }] },
+        { id: 'block3', type: 'single', exerciseIds: ['incline-db-press'], repMin: 8, repMax: 12, rir: 2, targetWeight: null, sequence: [{ type: 'set' }] },
+      ],
+    }
+  }
+
+  function started() {
+    const routine = threeBlockRoutine()
+    return reducer(baseState({ routines: [routine], routineOrder: [routine.id] }), { type: 'START_WORKOUT', payload: { routineId: routine.id } })
+  }
+
+  function withLoggedValues(state, exerciseIndex) {
+    const aw = state.activeWorkout
+    const exercises = aw.exercises.map((e, i) => (i === exerciseIndex ? { ...e, sets: e.sets.map((s) => ({ ...s, weight: '60', reps: '10' })) } : e))
+    return { ...state, activeWorkout: { ...aw, exercises } }
+  }
+
+  it('jumps to the next unfinished exercise once the current one\'s only set is checked off', () => {
+    const state = withLoggedValues(started(), 0)
+    const next = reducer(state, { type: 'TOGGLE_SET_DONE', payload: { exerciseIndex: 0, setIndex: 0 } })
+    expect(next.activeWorkout.currentIndex).toBe(1)
+  })
+
+  it('does not move currentIndex when toggling a set on a unit that isn\'t the active one', () => {
+    const state = withLoggedValues(started(), 1)
+    const next = reducer(state, { type: 'TOGGLE_SET_DONE', payload: { exerciseIndex: 1, setIndex: 0 } })
+    expect(next.activeWorkout.currentIndex).toBe(0)
+  })
+
+  it('does not move currentIndex when un-checking an already-done set', () => {
+    const state = withLoggedValues(started(), 0)
+    const done = reducer(state, { type: 'TOGGLE_SET_DONE', payload: { exerciseIndex: 0, setIndex: 0 } })
+    expect(done.activeWorkout.currentIndex).toBe(1)
+
+    const undone = reducer(done, { type: 'TOGGLE_SET_DONE', payload: { exerciseIndex: 0, setIndex: 0 } })
+    expect(undone.activeWorkout.currentIndex).toBe(1)
+  })
+
+  it('stays put when the just-finished exercise is the last one', () => {
+    const state = withLoggedValues(started(), 2)
+    const withCurrent = { ...state, activeWorkout: { ...state.activeWorkout, currentIndex: 2 } }
+    const next = reducer(withCurrent, { type: 'TOGGLE_SET_DONE', payload: { exerciseIndex: 2, setIndex: 0 } })
+    expect(next.activeWorkout.currentIndex).toBe(2)
+  })
+})
+
 describe('SET_NOTIF_FALLBACK', () => {
   it('sets the flag on the active workout when a workout is active', () => {
     const routine = sampleRoutine()

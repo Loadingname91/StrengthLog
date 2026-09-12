@@ -397,11 +397,22 @@ export function reducer(state, action) {
         restTotalSec = restSeconds
       }
 
+      // Once every set of the exercise the user is actively logging is
+      // checked off, fold it and jump ahead to the next unfinished one
+      // instead of leaving it expanded until a manual tap on the next row.
+      // Only fires off the currently-expanded unit finishing — toggling a
+      // set on some other (already-collapsed) unit must never steal focus.
+      let currentIndex = aw.currentIndex
+      if (willBeDone && exerciseIndex === aw.currentIndex && exercises[exerciseIndex].sets.every((s) => s.done)) {
+        const nextIncomplete = exercises.findIndex((e, i) => i > exerciseIndex && !e.sets.every((s) => s.done))
+        if (nextIncomplete !== -1) currentIndex = nextIncomplete
+      }
+
       // `at` disambiguates two PRs that land on the same {exerciseIndex,
       // setIndex} coordinate — e.g. after SWAP_EXERCISE clears a unit's sets
       // and set 0 becomes a PR again. useWorkoutNotifications.js folds it
       // into its dedupe key so the second PR still fires a notification.
-      return { ...state, activeWorkout: { ...aw, exercises, restUntil, restExerciseIndex, restSetIndex, restTotalSec, lastPR: isPR ? { exerciseIndex, setIndex, at: Date.now() } : aw.lastPR } }
+      return { ...state, activeWorkout: { ...aw, exercises, currentIndex, restUntil, restExerciseIndex, restSetIndex, restTotalSec, lastPR: isPR ? { exerciseIndex, setIndex, at: Date.now() } : aw.lastPR } }
     }
 
     case 'GOTO_EXERCISE':
