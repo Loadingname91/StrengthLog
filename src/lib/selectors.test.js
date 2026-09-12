@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   bestProductForExercise, estimateDuration, recomputePRFlags, totalVolume, totalReps, totalSets, muscleSetCounts, exerciseSetCounts,
   recentPRs, recentSessions, dayTallies, weekStreak, exerciseProgress, epley1RM,
+  rirBucketCounts, avgRirByMuscle, weeklySeries, acuteChronicLoad,
 } from './selectors'
 import { localISODate } from './format'
 
@@ -273,5 +274,107 @@ describe('exerciseProgress', () => {
     expect(p.weightDelta).toBeNull()
     expect(p.e1rmTotalDelta).toBeNull()
     expect(exerciseProgress(sessions, 'never-logged')).toBeNull()
+  })
+})
+
+describe('rirBucketCounts', () => {
+  it('buckets 0-1 as hard, 2 as moderate, 3+ as easy, and ignores unlogged RIR', () => {
+    const sessions = [
+      session({
+        entries: [{
+          exerciseId: 'bench-press',
+          sets: [{ weight: 60, reps: 8, rir: 0 }, { weight: 60, reps: 8, rir: 1 }, { weight: 60, reps: 8, rir: 2 }, { weight: 60, reps: 8, rir: 3 }, { weight: 60, reps: 8, rir: null }],
+        }],
+      }),
+    ]
+    expect(rirBucketCounts(sessions)).toEqual({ hard: 2, moderate: 1, easy: 1, total: 4 })
+  })
+
+  it('returns all zeros when nothing has RIR logged', () => {
+    const sessions = [session({ entries: [{ exerciseId: 'bench-press', sets: [{ weight: 60, reps: 8, rir: null }] }] })]
+    expect(rirBucketCounts(sessions)).toEqual({ hard: 0, moderate: 0, easy: 0, total: 0 })
+  })
+})
+
+describe('avgRirByMuscle', () => {
+  it('averages RIR per primary muscle, sorted hardest-trained first', () => {
+    const sessions = [
+      session({
+        entries: [
+          // bench-press: primary Chest
+          { exerciseId: 'bench-press', sets: [{ weight: 60, reps: 8, rir: 0 }, { weight: 60, reps: 8, rir: 2 }] },
+          // back-squat: primary Legs
+          { exerciseId: 'back-squat', sets: [{ weight: 100, reps: 5, rir: 3 }] },
+        ],
+      }),
+    ]
+    const rows = avgRirByMuscle(sessions)
+    expect(rows).toEqual([
+      { muscle: 'Chest', avgRir: 1, sets: 2 },
+      { muscle: 'Legs', avgRir: 3, sets: 1 },
+    ])
+  })
+
+  it('excludes sets with no RIR logged from the average', () => {
+    const sessions = [
+      session({ entries: [{ exerciseId: 'bench-press', sets: [{ weight: 60, reps: 8, rir: 2 }, { weight: 60, reps: 8, rir: null }] }] }),
+    ]
+    expect(avgRirByMuscle(sessions)).toEqual([{ muscle: 'Chest', avgRir: 2, sets: 1 }])
+  })
+})
+
+describe('weeklySeries', () => {
+  it('buckets sets/volume into Monday-start weeks, oldest to newest', () => {
+    // A Wednesday and the following Monday — two different weeks.
+    const sessions = [
+      session({ date: '2026-01-07', entries: [{ exerciseId: 'bench-press', sets: [{ weight: 60, reps: 10 }] }] }), // Wed
+      session({ date: '2026-01-12', entries: [{ exerciseId: 'bench-press', sets: [{ weight: 60, reps: 10 }, { weight: 60, reps: 10 }] }] }), // Mon
+    ]
+    const today = new Date('2026-01-12T12:00:00')
+    const series = weeklySeries(sessions, 'sets', 2, today)
+    expect(series).toHaveLength(2)
+    expect(series[0].value).toBe(1)
+    expect(series[1].value).toBe(2)
+  })
+
+  it('averages RIR within a week and reports 0 for a week with none logged', () => {
+    const sessions = [
+      session({ date: '2026-01-12', entries: [{ exerciseId: 'bench-press', sets: [{ weight: 60, reps: 10, rir: 1 }, { weight: 60, reps: 10, rir: 3 }] }] }),
+    ]
+    const today = new Date('2026-01-12T12:00:00')
+    const series = weeklySeries(sessions, 'avgRir', 2, today)
+    expect(series[0].value).toBe(0)
+    expect(series[1].value).toBe(2)
+  })
+})
+
+describe('acuteChronicLoad', () => {
+  it('computes acute (7d) load against the trailing 4-week average, which includes the acute week itself', () => {
+    const today = new Date('2026-02-01T12:00:00')
+    const sessions = [
+      // Acute window (last 7 days, inclusive of today) — also counts toward
+      // the chronic 4-week average, matching the standard ACWR definition.
+      session({ id: 'a', date: '2026-01-30', volume: 1000, entries: [] }),
+      session({ id: 'b', date: '2026-01-10', volume: 2000, entries: [] }),
+      session({ id: 'c', date: '2026-01-15', volume: 2000, entries: [] }),
+    ]
+    const result = acuteChronicLoad(sessions, today)
+    expect(result.acuteLoad).toBe(1000)
+    expect(result.chronicWeeklyAvg).toBe(1250) // (1000+2000+2000)/4 weeks
+    expect(result.ratio).toBe(0.8)
+    expect(result.hasBaseline).toBe(true)
+  })
+
+  it('reports no baseline when every session falls inside the acute window itself', () => {
+    const today = new Date('2026-02-01T12:00:00')
+    const sessions = [session({ date: '2026-01-30', volume: 1000, entries: [] })]
+    const result = acuteChronicLoad(sessions, today)
+    expect(result.hasBaseline).toBe(false)
+  })
+
+  it('reports null ratio when there is no training at all', () => {
+    const result = acuteChronicLoad([], new Date('2026-02-01T12:00:00'))
+    expect(result.ratio).toBeNull()
+    expect(result.hasBaseline).toBe(false)
   })
 })

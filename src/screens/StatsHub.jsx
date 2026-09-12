@@ -12,6 +12,7 @@ import { daysAgo, fmtDate, fmtMonthYear, round1, todayISO } from '../lib/format'
 import {
   sessionsSince, muscleSetCounts, exerciseSetCounts, chartSeries,
   totalSets, totalReps, totalVolume,
+  rirBucketCounts, avgRirByMuscle, e1rmHistory, weeklySeries, acuteChronicLoad,
 } from '../lib/selectors'
 
 const TABS = [
@@ -51,8 +52,16 @@ export default function StatsHub() {
   )
 }
 
+// exerciseProgress/e1rmHistory rank a "top" set by estimated 1RM, so the
+// most-trained lifts in range (by set count) are the ones worth trending —
+// showing every exercise would bury the handful of main lifts under
+// accessory-work noise.
+const TOP_LIFTS_SHOWN = 3
+const SPARKLINE_POINTS = 8
+
 function OverviewTab() {
-  const { state } = useStore()
+  const { state, exercises } = useStore()
+  const navigate = useNavigate()
   const [rangeDays, setRangeDays] = useState(30)
   const from = daysAgo(rangeDays - 1)
   const inRange = useMemo(() => sessionsSince(state.sessions, from), [state.sessions, rangeDays])
@@ -75,6 +84,37 @@ function OverviewTab() {
     sets: round1(inRange.reduce((s, sess) => s + totalSets(sess), 0) / weeks),
     volume: round1(inRange.reduce((s, sess) => s + totalVolume(sess), 0) / weeks),
   }), [inRange, weeks])
+
+  const rirCounts = useMemo(() => rirBucketCounts(inRange), [inRange])
+  const rirByMuscle = useMemo(() => avgRirByMuscle(inRange, exercises), [inRange, exercises])
+  const rirPct = (n) => (rirCounts.total ? Math.round((n / rirCounts.total) * 100) : 0)
+
+  // The most-trained lifts in range, each with its full e1RM history (not
+  // clipped to the 7d/30d/90d selector above) — a strength trend needs more
+  // than a few days of look-back to mean anything, even when "recently
+  // trained" is what picks which lifts to show.
+  const topLifts = useMemo(() => {
+    const counts = exerciseSetCounts(inRange)
+    return Object.keys(counts)
+      .sort((a, b) => counts[b] - counts[a])
+      .slice(0, TOP_LIFTS_SHOWN)
+      .map((id) => {
+        const hist = e1rmHistory(state.sessions, id).slice(-SPARKLINE_POINTS)
+        const current = hist.at(-1)?.value ?? 0
+        const delta = hist.length > 1 ? round1(current - hist[0].value) : null
+        return { id, name: exerciseById(id, exercises)?.name || id, series: hist, current, delta }
+      })
+  }, [inRange, state.sessions, exercises])
+
+  const weeklyVolume = useMemo(() => weeklySeries(state.sessions, 'volume', 12), [state.sessions])
+  const acwr = useMemo(() => acuteChronicLoad(state.sessions), [state.sessions])
+  const acwrReadout = !acwr.hasBaseline
+    ? 'Log a few more weeks to unlock this.'
+    : acwr.ratio > 1.5
+      ? 'Spiking — consider backing off soon.'
+      : acwr.ratio >= 0.8
+        ? 'In the sweet spot.'
+        : 'Below your usual load.'
 
   return (
     <div className="flex flex-col gap-5 px-5">
@@ -104,6 +144,82 @@ function OverviewTab() {
           <StatTile label="Sets" value={weekly.sets} />
           <StatTile label={`Volume (${state.settings.units})`} value={weekly.volume} />
         </div>
+      </div>
+
+      {topLifts.length > 0 && (
+        <div>
+          <div className="font-serif mb-0.5 text-base font-semibold">Strength trend</div>
+          <div className="mb-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+            Est. 1RM over your last {SPARKLINE_POINTS} sessions of each lift — not limited to the range above.
+          </div>
+          <div className="flex flex-col gap-2">
+            {topLifts.map((lift) => (
+              <Card key={lift.id} onClick={() => navigate(`/exercise/${lift.id}`)}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-sm font-semibold">{lift.name}</span>
+                  <span className="tabular-nums shrink-0 text-sm font-bold">
+                    {lift.current}{state.settings.units} e1RM
+                    {lift.delta != null && lift.delta !== 0 && (
+                      <span className="ml-1.5 text-[11px] font-semibold" style={{ color: lift.delta > 0 ? 'var(--accent-dark)' : 'var(--muted)' }}>
+                        {lift.delta > 0 ? '+' : ''}{lift.delta}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="-mx-1 mt-1">
+                  <LineChart series={lift.series} height={50} />
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <div className="font-serif mb-2 text-base font-semibold">Training intensity (RIR)</div>
+        <Card>
+          {rirCounts.total > 0 ? (
+            <>
+              <div className="flex h-3 overflow-hidden rounded-full" style={{ background: 'var(--surface-alt)' }}>
+                <div style={{ width: `${rirPct(rirCounts.hard)}%`, background: 'var(--accent)' }} />
+                <div style={{ width: `${rirPct(rirCounts.moderate)}%`, background: 'var(--accent-light)' }} />
+                <div style={{ width: `${rirPct(rirCounts.easy)}%`, background: 'var(--border)' }} />
+              </div>
+              <div className="mt-2 flex justify-between text-[10.5px]" style={{ color: 'var(--muted)' }}>
+                <span>{rirPct(rirCounts.hard)}% at 0–1 RIR</span>
+                <span>{rirPct(rirCounts.moderate)}% at 2 RIR</span>
+                <span>{rirPct(rirCounts.easy)}% at 3+ RIR</span>
+              </div>
+              {rirByMuscle.length > 0 && (
+                <div className="mt-3 flex flex-col gap-1.5 border-t pt-2.5" style={{ borderColor: 'var(--border)' }}>
+                  {rirByMuscle.map((r) => (
+                    <div key={r.muscle} className="flex items-center justify-between text-xs">
+                      <span style={{ color: 'var(--muted)' }}>{r.muscle}</span>
+                      <span className="tabular-nums font-semibold">{r.avgRir} RIR avg · {r.sets} sets</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="py-2 text-center text-sm" style={{ color: 'var(--muted)' }}>No RIR logged in this range.</div>
+          )}
+        </Card>
+      </div>
+
+      <div>
+        <div className="font-serif mb-0.5 text-base font-semibold">Weekly training load</div>
+        <div className="mb-2 text-[11px]" style={{ color: 'var(--muted)' }}>Last 12 weeks, regardless of the range above.</div>
+        <Card>
+          <LineChart series={weeklyVolume} mode="bar" />
+          <div className="mt-3 flex items-center justify-between rounded-xl p-2.5" style={{ background: 'var(--surface-alt)' }}>
+            <div>
+              <div className="text-[10.5px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Acute:chronic ratio</div>
+              <div className="tabular-nums text-lg font-bold">{acwr.hasBaseline ? acwr.ratio : '—'}</div>
+            </div>
+            <div className="max-w-[55%] text-right text-[11px]" style={{ color: 'var(--muted)' }}>{acwrReadout}</div>
+          </div>
+        </Card>
       </div>
     </div>
   )

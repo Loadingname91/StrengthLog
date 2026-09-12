@@ -295,16 +295,30 @@ export function trailingComparison(sessions, days = 7, lookback = 4) {
   }
 }
 
+// Ranked by estimated 1RM, not weight*reps: a light high-rep set can win on
+// raw product (53.75x10 beats 63.75x8) and would headline a session with the
+// lifter's *lightest* set, understating the strength they showed.
+function topSetByE1RM(sets) {
+  return sets.reduce((best, s) => (epley1RM(s.weight, s.reps) > epley1RM(best.weight, best.reps) ? s : best), sets[0])
+}
+
+// One point per session actually logging this exercise (not one per
+// calendar day, most of which have nothing) — the shape a sparkline needs
+// for a lift that isn't trained daily.
+export function e1rmHistory(sessions, exerciseId) {
+  return exerciseHistory(sessions, exerciseId).map((h) => {
+    const top = topSetByE1RM(h.sets)
+    return { date: h.date, value: epley1RM(top.weight, top.reps) }
+  })
+}
+
 // Latest top set vs the session before it, plus the change across all logged
 // history. At the handful-of-sessions scale this app operates at, these
 // numbers carry the progression a line chart can only hint at.
 export function exerciseProgress(sessions, exerciseId) {
   const hist = exerciseHistory(sessions, exerciseId)
   if (!hist.length) return null
-  // Ranked by estimated 1RM, not weight*reps: a light high-rep set can win on
-  // raw product (53.75x10 beats 63.75x8) and would headline a session with
-  // the lifter's *lightest* set, understating the strength they showed.
-  const topOf = (sets) => sets.reduce((best, s) => (epley1RM(s.weight, s.reps) > epley1RM(best.weight, best.reps) ? s : best), sets[0])
+  const topOf = topSetByE1RM
   const latest = topOf(hist[hist.length - 1].sets)
   const prev = hist.length > 1 ? topOf(hist[hist.length - 2].sets) : null
   const first = topOf(hist[0].sets)
@@ -331,4 +345,96 @@ export function totalReps(session) {
 
 export function totalSets(session) {
   return session.entries.reduce((sum, e) => sum + e.sets.length, 0)
+}
+
+// Proximity-to-failure buckets over every RIR-logged set in range — the one
+// intensity signal the app records (per set, and per routine block as a
+// target) but never otherwise surfaces. Tonnage alone can't distinguish a
+// grinding session from a comfortable one; this can. Sets logged before RIR
+// tracking existed (or with it switched off) carry rir: null and are
+// excluded rather than counted as "0", which would misread as maximal effort.
+export function rirBucketCounts(sessions) {
+  const buckets = { hard: 0, moderate: 0, easy: 0 }
+  for (const session of sessions) {
+    for (const set of allSets(session)) {
+      if (set.rir == null) continue
+      if (set.rir <= 1) buckets.hard++
+      else if (set.rir === 2) buckets.moderate++
+      else buckets.easy++
+    }
+  }
+  return { ...buckets, total: buckets.hard + buckets.moderate + buckets.easy }
+}
+
+// Average RIR per primary muscle group, ascending (hardest-trained first) —
+// surfaces the common pattern of grinding out compounds near failure while
+// leaving accessory work several reps in reserve.
+export function avgRirByMuscle(sessions, exercises) {
+  const sums = {}
+  const counts = {}
+  for (const session of sessions) {
+    for (const entry of session.entries) {
+      const ex = exerciseById(entry.exerciseId, exercises)
+      if (!ex) continue
+      for (const set of entry.sets) {
+        if (set.rir == null) continue
+        sums[ex.primary] = (sums[ex.primary] || 0) + set.rir
+        counts[ex.primary] = (counts[ex.primary] || 0) + 1
+      }
+    }
+  }
+  return Object.keys(sums)
+    .map((muscle) => ({ muscle, avgRir: round1(sums[muscle] / counts[muscle]), sets: counts[muscle] }))
+    .sort((a, b) => a.avgRir - b.avgRir)
+}
+
+// One point per calendar week (Monday-start, oldest to newest, `weeks` of
+// them ending with the current in-progress week) — the trend a single
+// rolling-average tile can't show: a volume crash, a spike, or a missing
+// deload all read as flat "weekly average" numbers but are obvious on this
+// series.
+export function weeklySeries(sessions, metric, weeks = 12, today = new Date()) {
+  const currentWeekStart = startOfWeek(today)
+  const out = []
+  for (let i = weeks - 1; i >= 0; i--) {
+    const weekStart = new Date(currentWeekStart)
+    weekStart.setDate(weekStart.getDate() - i * 7)
+    const key = localISODate(weekStart)
+    const weekSessions = sessions.filter((s) => localISODate(startOfWeek(parseLocalDate(s.date))) === key)
+    let value = 0
+    if (metric === 'sets') value = weekSessions.reduce((sum, s) => sum + totalSets(s), 0)
+    else if (metric === 'volume') value = Math.round(weekSessions.reduce((sum, s) => sum + (s.volume || 0), 0))
+    else if (metric === 'avgRir') {
+      const rirs = weekSessions.flatMap((s) => allSets(s).map((set) => set.rir).filter((r) => r != null))
+      value = rirs.length ? round1(rirs.reduce((a, b) => a + b, 0) / rirs.length) : 0
+    }
+    out.push({ date: key, value })
+  }
+  return out
+}
+
+// Acute:chronic workload ratio — the last 7 days' tonnage against the
+// trailing 4 weeks' average weekly tonnage. ~0.8-1.3 is the commonly cited
+// sweet spot; a ratio climbing past ~1.5 flags a spike associated with
+// elevated injury/overtraining risk (Gabbett 2016) — the kind of red flag a
+// single "volume" tile can't raise because it has nothing to compare against.
+export function acuteChronicLoad(sessions, today = new Date()) {
+  const acuteFrom = new Date(today)
+  acuteFrom.setDate(acuteFrom.getDate() - 6)
+  const chronicFrom = new Date(today)
+  chronicFrom.setDate(chronicFrom.getDate() - 27)
+  const acute = sessionsInRange(sessions, acuteFrom, today)
+  const chronic = sessionsInRange(sessions, chronicFrom, today)
+  const acuteLoad = Math.round(acute.reduce((sum, s) => sum + (s.volume || 0), 0))
+  const chronicWeeklyAvg = Math.round(chronic.reduce((sum, s) => sum + (s.volume || 0), 0) / 4)
+  const acuteFromIso = localISODate(acuteFrom)
+  return {
+    acuteLoad,
+    chronicWeeklyAvg,
+    ratio: chronicWeeklyAvg > 0 ? round1(acuteLoad / chronicWeeklyAvg) : null,
+    // Whether there's training history *before* the acute window to compare
+    // against — without it the ratio would just be comparing this week to
+    // itself, reading as a meaningless 1.0 rather than "not enough data yet".
+    hasBaseline: chronic.some((s) => s.date < acuteFromIso),
+  }
 }
