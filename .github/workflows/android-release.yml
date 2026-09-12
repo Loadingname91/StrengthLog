@@ -7,6 +7,11 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag for an official release build (e.g. v1.1.0). Leave blank for an untagged artifact-only build.'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -72,12 +77,26 @@ jobs:
           git push -f origin "$TAG"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
+      # A manual run can request an official tagged release too (for when
+      # pushing the tag directly isn't an option) — the tag comes in via env,
+      # never interpolated straight into the script, since workflow_dispatch
+      # inputs are still free-form operator text.
+      - name: Tag manual build
+        if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+        id: manual_tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          git tag -f "$TAG" HEAD
+          git push -f origin "$TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'pull_request'
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'pull_request' || steps.manual_tag.outcome == 'success'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event_name == 'pull_request' && steps.pr_tag.outputs.tag || github.ref_name }}
-          name: "${{ github.event_name == 'pull_request' && format('PR #{0} build', github.event.pull_request.number) || github.ref_name }}"
+          tag_name: ${{ github.event_name == 'pull_request' && steps.pr_tag.outputs.tag || steps.manual_tag.outputs.tag || github.ref_name }}
+          name: "${{ github.event_name == 'pull_request' && format('PR #{0} build', github.event.pull_request.number) || steps.manual_tag.outputs.tag || github.ref_name }}"
           prerelease: ${{ github.event_name == 'pull_request' }}
           files: FitLog-debug.apk
           generate_release_notes: true
