@@ -575,41 +575,48 @@ function SetRow({
     }
   }
 
+  // Blur fires on every field exit — including tapping back into an earlier
+  // set to fix a typo — so the auto-advance (jumping to the next field) only
+  // happens for an explicit Enter; a plain blur just saves (auto-mark-done)
+  // without dragging focus somewhere the user didn't ask to go.
+  //
   // Shifting focus to the next field for real (below) fires a genuine
   // native blur on the field currently losing focus once it actually held
   // focus — which re-enters this same confirm handler synchronously before
   // the outer call returns. Without a guard, that second entry would
-  // re-dispatch TOGGLE_SET_DONE and cancel the first dispatch out (an
-  // immediate re-toggle back to not-done). confirmingRef makes the confirm
-  // sequence non-reentrant per row.
+  // re-dispatch TOGGLE_SET_DONE off a stale (pre-dispatch) closure and
+  // cancel the first dispatch out (an immediate re-toggle back to
+  // not-done). confirmingRef makes the confirm+advance sequence
+  // non-reentrant per row; it only needs to span the advance call, since a
+  // plain blur (advance=false) never triggers a further focus change.
   const confirmingRef = useRef(false)
 
-  function confirmWeight() {
+  function confirmWeight(advance) {
     if (confirmingRef.current || set.weight === '') return
     confirmingRef.current = true
     maybeAutoMarkDone()
-    focusReps()
+    if (advance) focusReps()
     confirmingRef.current = false
   }
 
-  function confirmReps() {
+  function confirmReps(advance) {
     if (confirmingRef.current || set.reps === '') return
     confirmingRef.current = true
     maybeAutoMarkDone()
-    focusNextWeightOrBlur()
+    if (advance) focusNextWeightOrBlur()
     confirmingRef.current = false
   }
 
   function onWeightKeyDown(e) {
     if (e.key !== 'Enter') return
     e.preventDefault()
-    confirmWeight()
+    confirmWeight(true)
   }
 
   function onRepsKeyDown(e) {
     if (e.key !== 'Enter') return
     e.preventDefault()
-    confirmReps()
+    confirmReps(true)
   }
 
   const weightPlaceholder = ghost ? String(ghost.weight) : (targetWeight != null ? String(targetWeight) : '—')
@@ -624,7 +631,7 @@ function SetRow({
         onChange={(e) => setField('weight', e.target.value)}
         onFocus={(e) => fillGhost('weight', e.target)}
         onKeyDown={onWeightKeyDown}
-        onBlur={confirmWeight}
+        onBlur={() => confirmWeight(false)}
         placeholder={weightPlaceholder}
         inputMode="decimal"
         enterKeyHint="next"
@@ -637,7 +644,7 @@ function SetRow({
         onChange={(e) => setField('reps', e.target.value)}
         onFocus={(e) => fillGhost('reps', e.target)}
         onKeyDown={onRepsKeyDown}
-        onBlur={confirmReps}
+        onBlur={() => confirmReps(false)}
         placeholder={ghost ? String(ghost.reps) : '—'}
         inputMode="numeric"
         enterKeyHint={isLastSet ? 'done' : 'next'}
