@@ -153,6 +153,104 @@ function buildActiveWorkoutFromRoutine(routine) {
   }
 }
 
+// Overlays one finished session entry's logged sets onto the matching unit
+// (by exerciseIndex within the unit, in order), for RESUME_SESSION. Extra
+// entry sets beyond what the unit currently defines (the routine's set count
+// changed since) are appended using the last matching slot as a template so
+// no logged data is dropped, just not perfectly interleaved into rounds.
+function overlayEntryOntoUnit(unit, entry) {
+  const exIdx = unit.exerciseIds.indexOf(entry.exerciseId)
+  let matched = 0
+  const sets = unit.sets.map((s) => {
+    if (s.exerciseIndex !== exIdx) return s
+    const es = entry.sets[matched]
+    matched += 1
+    if (!es) return s
+    return { ...s, weight: String(es.weight), reps: String(es.reps), rir: es.rir ?? null, done: true, isPR: !!es.isPR, durationSec: es.durationSec ?? null }
+  })
+  for (let i = matched; i < entry.sets.length; i++) {
+    const es = entry.sets[i]
+    const template = [...sets].reverse().find((s) => s.exerciseIndex === exIdx)
+      || { exerciseIndex: exIdx, exerciseId: entry.exerciseId, target: unit.target, targetRir: unit.rir, targetWeight: unit.targetWeight, roundIndex: null, setIndexInExercise: null }
+    sets.push({ ...template, weight: String(es.weight), reps: String(es.reps), rir: es.rir ?? null, done: true, isPR: !!es.isPR, durationSec: es.durationSec ?? null })
+  }
+  const restAfter = [...unit.restAfter, ...Array(sets.length - unit.sets.length).fill(null)]
+  return { ...unit, sets, restAfter }
+}
+
+// A leftover entry whose blockId/exerciseId no longer matches anything in
+// the current routine (block deleted/reordered since, or the session has no
+// routine at all — a CSV import, or the routine itself was deleted). Falls
+// back to a flat single-exercise unit built straight from the entry so the
+// logged sets are never silently dropped, even though superset grouping and
+// targets can't be recovered for it.
+function syntheticUnitFromEntry(entry) {
+  const sets = entry.sets.map((es) => ({
+    weight: String(es.weight),
+    reps: String(es.reps),
+    rir: es.rir ?? null,
+    done: true,
+    isPR: !!es.isPR,
+    durationSec: es.durationSec ?? null,
+    exerciseIndex: 0,
+    exerciseId: entry.exerciseId,
+    target: '',
+    targetRir: null,
+    targetWeight: null,
+    roundIndex: null,
+    setIndexInExercise: null,
+  }))
+  return {
+    blockId: entry.blockId || uid('block'),
+    blockType: 'single',
+    exerciseIds: [entry.exerciseId],
+    exerciseId: entry.exerciseId,
+    target: '',
+    rir: null,
+    targetWeight: null,
+    sets,
+    restAfter: sets.map(() => null),
+  }
+}
+
+// Rebuilds a runtime activeWorkout from a previously-finished session, so an
+// accidental "Finish" (or any completed session someone wants to keep
+// logging against) can be picked back up. FINISH_WORKOUT's transform is
+// lossy (done-ness, per-set targets, superset pairing, and rest/UI state are
+// all dropped — see its own comments), so this is a best-effort
+// reconstruction, not a true inverse: when the routine still resolves, its
+// current block/superset/target/rest structure is reused and the session's
+// logged values are overlaid onto it by exerciseId; anything that no longer
+// matches (routine edited/deleted, or a CSV-imported session with no
+// routine at all) falls back to a flat per-exercise unit instead of losing
+// that entry's sets.
+function buildActiveWorkoutFromSession(session, routine) {
+  const units = routine ? routine.blocks.map(expandUnit) : []
+  const leftovers = []
+
+  for (const entry of session.entries) {
+    const idx = units.findIndex((u) => u.blockId === entry.blockId && u.exerciseIds.includes(entry.exerciseId))
+    if (idx === -1) leftovers.push(syntheticUnitFromEntry(entry))
+    else units[idx] = overlayEntryOntoUnit(units[idx], entry)
+  }
+
+  return {
+    id: session.id,
+    routineId: session.routineId,
+    routineName: session.routineName,
+    startedAt: session.startedAt,
+    currentIndex: 0,
+    restUntil: null,
+    restExerciseIndex: null,
+    restSetIndex: null,
+    restTotalSec: null,
+    exercises: [...units, ...leftovers],
+    // Carried so DISCARD_WORKOUT/RESTART_WORKOUT can restore the original
+    // session to history instead of losing it if the resume is abandoned.
+    resumedFromSession: session,
+  }
+}
+
 export function reducer(state, action) {
   switch (action.type) {
     case 'SET_SETTINGS':
@@ -266,8 +364,15 @@ export function reducer(state, action) {
       return { ...state, activeWorkout: buildActiveWorkoutFromRoutine(routine) }
     }
 
-    case 'DISCARD_WORKOUT':
+    case 'DISCARD_WORKOUT': {
+      // A resumed session that gets discarded (not re-finished) must go
+      // back to history — it was already removed from state.sessions by
+      // RESUME_SESSION, and simply nulling activeWorkout here would lose it
+      // outright.
+      const resumed = state.activeWorkout?.resumedFromSession
+      if (resumed) return { ...state, sessions: [...state.sessions, resumed], activeWorkout: null }
       return { ...state, activeWorkout: null }
+    }
 
     case 'SET_SET_FIELD': {
       if (!state.activeWorkout) return state
@@ -587,7 +692,53 @@ export function reducer(state, action) {
       if (!state.activeWorkout) return state
       const routine = state.routines.find((r) => r.id === state.activeWorkout.routineId)
       if (!routine) return state
-      return { ...state, activeWorkout: buildActiveWorkoutFromRoutine(routine) }
+      // Same "don't lose a resumed session" concern as DISCARD_WORKOUT — a
+      // fresh restart from a resumed session's routine still abandons its
+      // logged data unless it's restored to history first.
+      const resumed = state.activeWorkout.resumedFromSession
+      const sessions = resumed ? [...state.sessions, resumed] : state.sessions
+      return { ...state, sessions, activeWorkout: buildActiveWorkoutFromRoutine(routine) }
+    }
+
+    case 'RESUME_SESSION': {
+      // Same defense-in-depth posture as START_WORKOUT: the UI already
+      // routes through a discard-confirmation sheet before reaching here
+      // when a workout is already active.
+      if (state.activeWorkout) return state
+      const session = state.sessions.find((s) => s.id === action.payload.id)
+      if (!session) return state
+      const routine = state.routines.find((r) => r.id === session.routineId)
+      return {
+        ...state,
+        sessions: state.sessions.filter((s) => s.id !== session.id),
+        activeWorkout: buildActiveWorkoutFromSession(session, routine),
+        lastFinishedSession: state.lastFinishedSession?.id === session.id ? null : state.lastFinishedSession,
+      }
+    }
+
+    case 'EDIT_SESSION_SET': {
+      const { sessionId, entryIndex, setIndex, field, value } = action.payload
+      if ((field === 'weight' || field === 'reps' || field === 'durationSec') && !(Number.isFinite(value) && value >= 0)) return state
+      if (field === 'rir' && value != null && !Number.isFinite(value)) return state
+      const sessions = state.sessions.map((s) => {
+        if (s.id !== sessionId) return s
+        const entries = s.entries.map((e, i) => {
+          if (i !== entryIndex) return e
+          const sets = e.sets.map((set, j) => (j === setIndex ? { ...set, [field]: value } : set))
+          return { ...e, sets }
+        })
+        const next = { ...s, entries }
+        next.volume = Math.round(totalVolume(next))
+        return next
+      })
+      // A corrected weight/reps can promote or demote PR status for this
+      // session and every later one that used it as the bar to beat — the
+      // same whole-history recompute DELETE_SESSION already relies on.
+      const recomputed = recomputePRFlags(sessions)
+      const lastFinishedSession = state.lastFinishedSession?.id === sessionId
+        ? recomputed.find((s) => s.id === sessionId)
+        : state.lastFinishedSession
+      return { ...state, sessions: recomputed, lastFinishedSession }
     }
 
     case 'IMPORT_SESSIONS':

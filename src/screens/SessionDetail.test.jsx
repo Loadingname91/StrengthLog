@@ -172,4 +172,66 @@ describe('SessionDetail', () => {
     expect(testStore.getState().activeWorkout.routineId).toBe('r1')
     expect(navigateMock).toHaveBeenCalledWith('/workout')
   })
+
+  it('Resume workout pulls the session back into activeWorkout and navigates to /workout', () => {
+    renderDetail()
+
+    fireEvent.click(screen.getByText('⋮'))
+    fireEvent.click(screen.getByText('Resume workout'))
+
+    expect(testStore.getState().sessions).toHaveLength(0)
+    expect(testStore.getState().activeWorkout).not.toBeNull()
+    expect(testStore.getState().activeWorkout.id).toBe('s1')
+    expect(navigateMock).toHaveBeenCalledWith('/workout')
+  })
+
+  it('Resume workout is never disabled, even without a matching routine', () => {
+    renderDetail(sampleSession(), { routines: [] })
+
+    fireEvent.click(screen.getByText('⋮'))
+    expect(screen.getByText('Resume workout')).not.toBeDisabled()
+  })
+
+  it('resuming over an already-active workout asks for confirmation before discarding it', () => {
+    renderDetail(sampleSession(), { activeWorkout: { id: 'existing-workout' } })
+
+    fireEvent.click(screen.getByText('⋮'))
+    fireEvent.click(screen.getByText('Resume workout'))
+
+    expect(screen.getByText('A workout is already in progress')).toBeInTheDocument()
+    expect(testStore.getState().activeWorkout.id).toBe('existing-workout') // untouched until confirmed
+
+    fireEvent.click(screen.getByText('Discard & resume'))
+
+    expect(testStore.getState().activeWorkout.id).toBe('s1')
+    expect(navigateMock).toHaveBeenCalledWith('/workout')
+  })
+
+  it('Edit entries toggles inline weight/reps inputs and saves a correction via EDIT_SESSION_SET', () => {
+    renderDetail()
+
+    fireEvent.click(screen.getByText('⋮'))
+    fireEvent.click(screen.getByText('Edit entries'))
+
+    const weightInput = screen.getAllByRole('textbox')[0]
+    fireEvent.change(weightInput, { target: { value: '65' } })
+    fireEvent.blur(weightInput)
+
+    expect(testStore.getState().sessions[0].entries[0].sets[0].weight).toBe(65)
+    expect(testStore.getState().sessions[0].volume).toBe(650)
+  })
+
+  it('an invalid edit (blank/negative) is discarded, reverting the input to the stored value', () => {
+    renderDetail()
+
+    fireEvent.click(screen.getByText('⋮'))
+    fireEvent.click(screen.getByText('Edit entries'))
+
+    const weightInput = screen.getAllByRole('textbox')[0]
+    fireEvent.change(weightInput, { target: { value: '' } })
+    fireEvent.blur(weightInput)
+
+    expect(testStore.getState().sessions[0].entries[0].sets[0].weight).toBe(60)
+    expect(weightInput.value).toBe('60')
+  })
 })

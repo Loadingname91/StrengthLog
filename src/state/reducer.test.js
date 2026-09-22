@@ -807,3 +807,184 @@ describe('SET_FINISH_REQUESTED', () => {
     expect(next).toBe(state)
   })
 })
+
+describe('RESUME_SESSION', () => {
+  it('pulls the session out of history and back into activeWorkout, prefilled and marked done', () => {
+    const routine = sampleRoutine()
+    const s1 = sessionWithSet('s1', '2026-01-01', 'bench-press', 60, 10)
+    const state = baseState({ routines: [routine], routineOrder: [routine.id], sessions: [s1] })
+
+    const next = reducer(state, { type: 'RESUME_SESSION', payload: { id: 's1' } })
+
+    expect(next.sessions).toEqual([])
+    expect(next.activeWorkout).not.toBeNull()
+    expect(next.activeWorkout.id).toBe('s1')
+    expect(next.activeWorkout.routineId).toBe('r1')
+    expect(next.activeWorkout.startedAt).toBe(s1.startedAt)
+    const sets = next.activeWorkout.exercises[0].sets
+    expect(sets[0]).toMatchObject({ weight: '60', reps: '10', rir: 2, done: true })
+    // The routine's other two blank sets stay untouched, still to be filled.
+    expect(sets[1].done).toBe(false)
+    expect(sets[2].done).toBe(false)
+  })
+
+  it('appends extra sets beyond the routine\'s current count instead of dropping them', () => {
+    const routine = sampleRoutine() // routine defines only 3 sets
+    const s1 = sessionWithSet('s1', '2026-01-01', 'bench-press', 60, 10)
+    s1.entries[0].sets.push({ weight: 65, reps: 8, rir: 1, isPR: false }, { weight: 70, reps: 6, rir: 0, isPR: false }, { weight: 75, reps: 5, rir: 0, isPR: false }, { weight: 80, reps: 4, rir: 0, isPR: false })
+    const state = baseState({ routines: [routine], routineOrder: [routine.id], sessions: [s1] })
+
+    const next = reducer(state, { type: 'RESUME_SESSION', payload: { id: 's1' } })
+
+    const sets = next.activeWorkout.exercises[0].sets
+    expect(sets).toHaveLength(5)
+    expect(sets.every((s) => s.done)).toBe(true)
+    expect(sets[4]).toMatchObject({ weight: '80', reps: '4' })
+  })
+
+  it('falls back to a flat synthetic unit when the routine was deleted (routineId no longer resolves)', () => {
+    const s1 = sessionWithSet('s1', '2026-01-01', 'bench-press', 60, 10)
+    const state = baseState({ routines: [], sessions: [s1] }) // routine gone
+
+    const next = reducer(state, { type: 'RESUME_SESSION', payload: { id: 's1' } })
+
+    expect(next.activeWorkout.exercises).toHaveLength(1)
+    const unit = next.activeWorkout.exercises[0]
+    expect(unit.blockType).toBe('single')
+    expect(unit.sets).toMatchObject([{ weight: '60', reps: '10', done: true, exerciseId: 'bench-press' }])
+  })
+
+  it('overlays each superset exercise\'s sets onto its own exerciseIndex slots, in order', () => {
+    const routine = supersetRoutine()
+    const s1 = {
+      id: 's1', routineId: 'r1', routineName: 'Push Day', date: '2026-01-01',
+      startedAt: '2026-01-01T10:00:00.000Z', finishedAt: '2026-01-01T10:30:00.000Z', durationSec: 1800, note: '',
+      entries: [
+        { exerciseId: 'bench-press', blockId: 'block1', sets: [{ weight: 60, reps: 10, rir: 2, isPR: false }, { weight: 62, reps: 9, rir: 1, isPR: false }] },
+        { exerciseId: 'barbell-row', blockId: 'block1', sets: [{ weight: 40, reps: 12, rir: 2, isPR: false }, { weight: 42, reps: 11, rir: 1, isPR: false }] },
+      ],
+      volume: 0, prCount: 0,
+    }
+    const state = baseState({ routines: [routine], routineOrder: [routine.id], sessions: [s1] })
+
+    const next = reducer(state, { type: 'RESUME_SESSION', payload: { id: 's1' } })
+
+    const unit = next.activeWorkout.exercises[0]
+    expect(unit.blockType).toBe('superset')
+    const benchSets = unit.sets.filter((s) => s.exerciseId === 'bench-press')
+    const rowSets = unit.sets.filter((s) => s.exerciseId === 'barbell-row')
+    expect(benchSets.map((s) => s.weight)).toEqual(['60', '62'])
+    expect(rowSets.map((s) => s.weight)).toEqual(['40', '42'])
+    expect(unit.sets.every((s) => s.done)).toBe(true)
+  })
+
+  it('is a no-op when a workout is already active (UI must discard first)', () => {
+    const s1 = sessionWithSet('s1', '2026-01-01', 'bench-press', 60, 10)
+    const state = baseState({ sessions: [s1], activeWorkout: { id: 'existing' } })
+
+    const next = reducer(state, { type: 'RESUME_SESSION', payload: { id: 's1' } })
+    expect(next).toBe(state)
+  })
+
+  it('is a no-op when the session id is unknown', () => {
+    const state = baseState({ sessions: [] })
+    const next = reducer(state, { type: 'RESUME_SESSION', payload: { id: 'nope' } })
+    expect(next).toBe(state)
+  })
+})
+
+describe('resuming a session and abandoning it restores it to history', () => {
+  it('DISCARD_WORKOUT puts the resumed session back into sessions', () => {
+    const routine = sampleRoutine()
+    const s1 = sessionWithSet('s1', '2026-01-01', 'bench-press', 60, 10)
+    const resumed = reducer(baseState({ routines: [routine], routineOrder: [routine.id], sessions: [s1] }), { type: 'RESUME_SESSION', payload: { id: 's1' } })
+
+    const discarded = reducer(resumed, { type: 'DISCARD_WORKOUT' })
+
+    expect(discarded.activeWorkout).toBeNull()
+    expect(discarded.sessions).toHaveLength(1)
+    expect(discarded.sessions[0].id).toBe('s1')
+  })
+
+  it('RESTART_WORKOUT also restores the resumed session before rebuilding fresh', () => {
+    const routine = sampleRoutine()
+    const s1 = sessionWithSet('s1', '2026-01-01', 'bench-press', 60, 10)
+    const resumed = reducer(baseState({ routines: [routine], routineOrder: [routine.id], sessions: [s1] }), { type: 'RESUME_SESSION', payload: { id: 's1' } })
+
+    const restarted = reducer(resumed, { type: 'RESTART_WORKOUT' })
+
+    expect(restarted.sessions).toHaveLength(1)
+    expect(restarted.sessions[0].id).toBe('s1')
+    expect(restarted.activeWorkout.exercises[0].sets.every((s) => s.weight === '' && !s.done)).toBe(true)
+  })
+
+  it('a plain (non-resumed) DISCARD_WORKOUT still just clears activeWorkout', () => {
+    const state = baseState({ activeWorkout: { id: 'w1' } })
+    const next = reducer(state, { type: 'DISCARD_WORKOUT' })
+    expect(next.activeWorkout).toBeNull()
+    expect(next.sessions).toEqual([])
+  })
+})
+
+describe('EDIT_SESSION_SET', () => {
+  it('updates the given set field and recomputes the session\'s volume', () => {
+    const s1 = sessionWithSet('s1', '2026-01-01', 'bench-press', 60, 10)
+    const state = baseState({ sessions: [s1] })
+
+    const next = reducer(state, { type: 'EDIT_SESSION_SET', payload: { sessionId: 's1', entryIndex: 0, setIndex: 0, field: 'weight', value: 100 } })
+
+    const set = next.sessions[0].entries[0].sets[0]
+    expect(set.weight).toBe(100)
+    expect(next.sessions[0].volume).toBe(1000) // 100 * 10
+  })
+
+  it('rejects a negative or non-finite weight/reps, leaving the session unchanged', () => {
+    const s1 = sessionWithSet('s1', '2026-01-01', 'bench-press', 60, 10)
+    const state = baseState({ sessions: [s1] })
+
+    const next = reducer(state, { type: 'EDIT_SESSION_SET', payload: { sessionId: 's1', entryIndex: 0, setIndex: 0, field: 'weight', value: NaN } })
+    expect(next).toBe(state)
+
+    const next2 = reducer(state, { type: 'EDIT_SESSION_SET', payload: { sessionId: 's1', entryIndex: 0, setIndex: 0, field: 'reps', value: -5 } })
+    expect(next2).toBe(state)
+  })
+
+  it('recomputes PR flags across sessions after a correction changes who holds the PR', () => {
+    // s0 (600) sets the baseline PR. s1 (1000) currently beats it. s2 (700)
+    // currently loses to s1. Correcting s1's weight down to 50 (product 500)
+    // drops it below both — s1 loses its PR, and s2 (700 > 600) gains one.
+    const s0 = sessionWithSet('s0', '2026-01-01', 'bench-press', 60, 10)
+    const s1 = sessionWithSet('s1', '2026-01-02', 'bench-press', 100, 10)
+    const s2 = sessionWithSet('s2', '2026-01-03', 'bench-press', 70, 10)
+    s0.entries[0].sets[0].isPR = true
+    s0.prCount = 1
+    s1.entries[0].sets[0].isPR = true
+    s1.prCount = 1
+    const state = baseState({ sessions: [s0, s1, s2] })
+
+    const next = reducer(state, { type: 'EDIT_SESSION_SET', payload: { sessionId: 's1', entryIndex: 0, setIndex: 0, field: 'weight', value: 50 } })
+
+    expect(next.sessions.find((s) => s.id === 's0').entries[0].sets[0].isPR).toBe(true)
+    expect(next.sessions.find((s) => s.id === 's1').entries[0].sets[0].isPR).toBe(false)
+    expect(next.sessions.find((s) => s.id === 's1').prCount).toBe(0)
+    expect(next.sessions.find((s) => s.id === 's2').entries[0].sets[0].isPR).toBe(true)
+    expect(next.sessions.find((s) => s.id === 's2').prCount).toBe(1)
+  })
+
+  it('updates lastFinishedSession when it is the session being edited', () => {
+    const s1 = sessionWithSet('s1', '2026-01-01', 'bench-press', 60, 10)
+    const state = baseState({ sessions: [s1], lastFinishedSession: s1 })
+
+    const next = reducer(state, { type: 'EDIT_SESSION_SET', payload: { sessionId: 's1', entryIndex: 0, setIndex: 0, field: 'reps', value: 12 } })
+
+    expect(next.lastFinishedSession.entries[0].sets[0].reps).toBe(12)
+  })
+
+  it('can edit RIR to null or a number', () => {
+    const s1 = sessionWithSet('s1', '2026-01-01', 'bench-press', 60, 10)
+    const state = baseState({ sessions: [s1] })
+
+    const next = reducer(state, { type: 'EDIT_SESSION_SET', payload: { sessionId: 's1', entryIndex: 0, setIndex: 0, field: 'rir', value: 3 } })
+    expect(next.sessions[0].entries[0].sets[0].rir).toBe(3)
+  })
+})
