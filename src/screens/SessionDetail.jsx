@@ -15,7 +15,8 @@ export default function SessionDetail() {
   const { showToast } = useToast()
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [conflict, setConflict] = useState(false)
+  const [conflict, setConflict] = useState(null) // null | 'repeat' | 'resume'
+  const [editing, setEditing] = useState(false)
 
   const session = state.sessions.find((s) => s.id === id)
   const [note, setNote] = useState(session?.note || '')
@@ -34,15 +35,24 @@ export default function SessionDetail() {
 
   function repeat() {
     setMenuOpen(false)
-    if (state.activeWorkout) { setConflict(true); return }
+    if (state.activeWorkout) { setConflict('repeat'); return }
     dispatch({ type: 'START_WORKOUT', payload: { routineId: session.routineId } })
     navigate('/workout')
   }
 
-  function confirmRepeatOverActive() {
+  function resume() {
+    setMenuOpen(false)
+    if (state.activeWorkout) { setConflict('resume'); return }
+    dispatch({ type: 'RESUME_SESSION', payload: { id: session.id } })
+    navigate('/workout')
+  }
+
+  function confirmOverActive() {
+    const action = conflict
     dispatch({ type: 'DISCARD_WORKOUT' })
-    dispatch({ type: 'START_WORKOUT', payload: { routineId: session.routineId } })
-    setConflict(false)
+    if (action === 'repeat') dispatch({ type: 'START_WORKOUT', payload: { routineId: session.routineId } })
+    else dispatch({ type: 'RESUME_SESSION', payload: { id: session.id } })
+    setConflict(null)
     navigate('/workout')
   }
 
@@ -50,6 +60,10 @@ export default function SessionDetail() {
     dispatch({ type: 'DELETE_SESSION', payload: session.id })
     showToast('Workout deleted')
     navigate('/stats/log', { replace: true })
+  }
+
+  function updateSet(entryIndex, setIndex, field, value) {
+    dispatch({ type: 'EDIT_SESSION_SET', payload: { sessionId: session.id, entryIndex, setIndex, field, value } })
   }
 
   return (
@@ -63,6 +77,18 @@ export default function SessionDetail() {
           <>
             <div className="fixed inset-0 z-[5]" onClick={() => setMenuOpen(false)} />
             <div className="absolute right-3 top-12 z-10 flex flex-col overflow-hidden rounded-xl border shadow-lg" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
+              <button
+                onClick={() => { setMenuOpen(false); setEditing((v) => !v) }}
+                className="whitespace-nowrap px-4 py-2.5 text-left text-sm"
+              >
+                {editing ? 'Done editing' : 'Edit entries'}
+              </button>
+              <button
+                onClick={resume}
+                className="whitespace-nowrap px-4 py-2.5 text-left text-sm"
+              >
+                Resume workout
+              </button>
               <button
                 onClick={repeat}
                 disabled={!routine}
@@ -100,22 +126,67 @@ export default function SessionDetail() {
               {exerciseById(entry.exerciseId, exercises)?.name || entry.exerciseId}
             </div>
             <div className="mt-2 flex flex-col gap-1.5">
-              {entry.sets.map((set, j) => (
-                <div key={j} className="flex items-center justify-between text-xs">
-                  <span style={{ color: 'var(--muted)' }}>Set {j + 1}</span>
-                  <div className="flex items-center gap-2">
-                    {state.settings.showRIR && set.rir != null && (
-                      <span style={{ color: 'var(--muted)' }}>RIR {set.rir}</span>
+              {entry.sets.map((set, j) => {
+                const isTimed = set.weight === 0 && set.reps === 0 && set.durationSec != null
+                return (
+                  <div key={j} className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span style={{ color: 'var(--muted)' }}>Set {j + 1}</span>
+                      {editing ? (
+                        <div className="flex items-center gap-1.5">
+                          {isTimed ? (
+                            <>
+                              <EditableNumber
+                                value={set.durationSec}
+                                integer
+                                onCommit={(v) => updateSet(i, j, 'durationSec', v)}
+                              />
+                              <span style={{ color: 'var(--muted)' }}>s</span>
+                            </>
+                          ) : (
+                            <>
+                              <EditableNumber value={set.weight} onCommit={(v) => updateSet(i, j, 'weight', v)} />
+                              <span style={{ color: 'var(--muted)' }}>{state.settings.units} ×</span>
+                              <EditableNumber value={set.reps} integer onCommit={(v) => updateSet(i, j, 'reps', v)} />
+                            </>
+                          )}
+                          {set.isPR && <span title="PR">🏆</span>}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          {state.settings.showRIR && set.rir != null && (
+                            <span style={{ color: 'var(--muted)' }}>RIR {set.rir}</span>
+                          )}
+                          <span className="tabular-nums font-semibold">
+                            {isTimed
+                              ? `${set.durationSec}s`
+                              : `${set.weight}${state.settings.units} × ${set.reps}${set.durationSec != null ? ` · ${set.durationSec}s` : ''}`}
+                          </span>
+                          {set.isPR && <span title="PR">🏆</span>}
+                        </div>
+                      )}
+                    </div>
+                    {editing && state.settings.showRIR && !isTimed && (
+                      <div className="flex justify-end gap-1.5">
+                        {[0, 1, 2, 3].map((r) => (
+                          <button
+                            key={r}
+                            onClick={() => updateSet(i, j, 'rir', r)}
+                            className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+                            style={{
+                              borderColor: set.rir === r ? 'var(--accent)' : 'var(--border)',
+                              background: set.rir === r ? 'var(--accent-light)' : 'transparent',
+                              color: set.rir === r ? 'var(--accent-dark)' : 'var(--muted)',
+                            }}
+                          >
+                            {r === 3 ? '3+' : r} RIR
+                          </button>
+                        ))}
+                      </div>
                     )}
-                    <span className="tabular-nums font-semibold">
-                      {set.weight === 0 && set.reps === 0 && set.durationSec != null
-                        ? `${set.durationSec}s`
-                        : `${set.weight}${state.settings.units} × ${set.reps}${set.durationSec != null ? ` · ${set.durationSec}s` : ''}`}
-                    </span>
-                    {set.isPR && <span title="PR">🏆</span>}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         ))}
@@ -144,13 +215,15 @@ export default function SessionDetail() {
       />
 
       <ConfirmSheet
-        open={conflict}
+        open={conflict != null}
         title="A workout is already in progress"
-        body="Repeating this workout will discard the one you're currently running."
-        confirmLabel="Discard & start new"
+        body={conflict === 'resume'
+          ? 'Resuming this workout will discard the one you\'re currently running.'
+          : 'Repeating this workout will discard the one you\'re currently running.'}
+        confirmLabel={conflict === 'resume' ? 'Discard & resume' : 'Discard & start new'}
         danger
-        onCancel={() => setConflict(false)}
-        onConfirm={confirmRepeatOverActive}
+        onCancel={() => setConflict(null)}
+        onConfirm={confirmOverActive}
       />
     </div>
   )
@@ -162,5 +235,32 @@ function Stat({ label, value, accent = false }) {
       <div className="text-lg font-bold" style={{ color: accent ? 'var(--accent)' : 'var(--text)' }}>{value}</div>
       <div className="text-[11px]" style={{ color: 'var(--muted)' }}>{label}</div>
     </div>
+  )
+}
+
+// Free-typing number input over a numeric session value: local text state so
+// a partial entry like "1." isn't stomped back to "1" by the controlled
+// value on every keystroke. Commits (and coerces back to the stored number
+// on anything invalid) only on blur, mirroring ActiveWorkout's set inputs.
+function EditableNumber({ value, integer = false, onCommit }) {
+  const [text, setText] = useState(String(value))
+
+  useEffect(() => { setText(String(value)) }, [value])
+
+  function commit() {
+    const parsed = integer ? parseInt(text, 10) : parseFloat(text)
+    if (Number.isFinite(parsed) && parsed >= 0) onCommit(parsed)
+    else setText(String(value))
+  }
+
+  return (
+    <input
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      inputMode={integer ? 'numeric' : 'decimal'}
+      className="tabular-nums w-14 rounded-lg border p-1 text-right text-xs font-semibold"
+      style={{ borderColor: 'var(--border)' }}
+    />
   )
 }
