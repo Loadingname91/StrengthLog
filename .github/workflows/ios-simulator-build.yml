@@ -1,0 +1,62 @@
+name: iOS Simulator Build
+
+# Compile-only verification that the iOS platform still builds — no Apple
+# Developer account, signing, or distribution involved. CODE_SIGNING_ALLOWED=NO
+# + the "generic/platform=iOS Simulator" destination mean this never boots a
+# simulator or produces anything installable; it only proves `npx cap sync
+# ios` + Xcode's build still succeed. See CLAUDE.md's Platform Requirements
+# for the real-device path (requires a paid Apple Developer account).
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          # Same reasoning as the Android workflow: build the PR's actual
+          # head commit, not the synthetic merge commit checkout defaults to.
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Web App
+        run: npm run build
+
+      - name: Sync Capacitor
+        run: npx cap sync ios
+
+      # Capacitor's iOS plugins resolve via Swift Package Manager (no
+      # CocoaPods/Podfile in this project) — caching SPM's checkout avoids
+      # re-fetching capacitor-swift-pm from GitHub on every run.
+      - name: Cache Swift Package Manager
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('ios/App/CapApp-SPM/Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Build for iOS Simulator
+        run: |
+          xcodebuild build \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO
