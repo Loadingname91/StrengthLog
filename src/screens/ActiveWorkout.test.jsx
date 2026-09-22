@@ -334,21 +334,39 @@ describe('quick timer', () => {
 })
 
 describe('ActiveWorkout fast set entry', () => {
-  it('confirming weight (blur) focuses that set\'s reps field', () => {
+  it('pressing Enter in weight focuses that set\'s reps field', () => {
     renderWorkout()
     fireEvent.change(weightInputs()[0], { target: { value: '60' } })
-    fireEvent.blur(weightInputs()[0])
+    fireEvent.keyDown(weightInputs()[0], { key: 'Enter' })
 
     expect(document.activeElement).toBe(repsInputs()[0])
   })
 
-  it('confirming reps focuses the next set\'s weight field', () => {
+  it('pressing Enter in reps focuses the next set\'s weight field', () => {
     renderWorkout()
     fireEvent.change(weightInputs()[0], { target: { value: '60' } })
     fireEvent.change(repsInputs()[0], { target: { value: '10' } })
-    fireEvent.blur(repsInputs()[0])
+    fireEvent.keyDown(repsInputs()[0], { key: 'Enter' })
 
     expect(document.activeElement).toBe(weightInputs()[1])
+  })
+
+  it('blurring a field without pressing Enter does not steal focus elsewhere (regression: editing an earlier set used to get yanked forward)', () => {
+    renderWorkout()
+    // Fill and blur set 0's weight the way tapping away to fix something
+    // else would — never having pressed Enter.
+    fireEvent.change(weightInputs()[0], { target: { value: '60' } })
+    fireEvent.blur(weightInputs()[0])
+    expect(document.activeElement).not.toBe(repsInputs()[0])
+
+    // Same for reps: blurring alone must not jump to the next set's weight.
+    fireEvent.change(repsInputs()[0], { target: { value: '10' } })
+    fireEvent.blur(repsInputs()[0])
+    expect(document.activeElement).not.toBe(weightInputs()[1])
+
+    // The value is still saved and the set still auto-marks done — only the
+    // forced focus jump is gone.
+    expect(testStore.getState().activeWorkout.exercises[0].sets[0].done).toBe(true)
   })
 
   it('auto-marks a set done once both weight and reps are valid', () => {
@@ -371,12 +389,12 @@ describe('ActiveWorkout fast set entry', () => {
 
   it('a second consecutive auto-advance does not re-toggle a set already marked done (regression: the focus shift genuinely blurs a field that really held focus, re-entering its own confirm handler)', () => {
     renderWorkout()
-    // Set 0: fill both fields via confirm (weight's real focus-shift to reps
+    // Set 0: fill both fields via Enter (weight's real focus-shift to reps
     // means reps genuinely holds focus afterward).
     fireEvent.change(weightInputs()[0], { target: { value: '60' } })
-    fireEvent.blur(weightInputs()[0])
+    fireEvent.keyDown(weightInputs()[0], { key: 'Enter' })
     fireEvent.change(repsInputs()[0], { target: { value: '10' } })
-    fireEvent.blur(repsInputs()[0])
+    fireEvent.keyDown(repsInputs()[0], { key: 'Enter' })
 
     expect(testStore.getState().activeWorkout.exercises[0].sets[0].done).toBe(true)
 
@@ -384,9 +402,9 @@ describe('ActiveWorkout fast set entry', () => {
     // advance, so confirming reps[1] triggers a real blur cascade back onto
     // reps[0] as focus moves elsewhere; that must not re-toggle set 0.
     fireEvent.change(weightInputs()[1], { target: { value: '65' } })
-    fireEvent.blur(weightInputs()[1])
+    fireEvent.keyDown(weightInputs()[1], { key: 'Enter' })
     fireEvent.change(repsInputs()[1], { target: { value: '8' } })
-    fireEvent.blur(repsInputs()[1])
+    fireEvent.keyDown(repsInputs()[1], { key: 'Enter' })
 
     expect(testStore.getState().activeWorkout.exercises[0].sets[0].done).toBe(true)
     expect(testStore.getState().activeWorkout.exercises[0].sets[1].done).toBe(true)
@@ -408,12 +426,12 @@ describe('ActiveWorkout merged superset (Phase 6)', () => {
     expect(screen.queryByText('?')).not.toBeInTheDocument()
   })
 
-  it('SUPER-02: confirming the first exercise\'s reps auto-advances focus into the second exercise\'s weight, within the same round', () => {
+  it('SUPER-02: pressing Enter after the first exercise\'s reps auto-advances focus into the second exercise\'s weight, within the same round', () => {
     renderWorkout(supersetWorkout())
 
     fireEvent.change(weightInputs()[0], { target: { value: '60' } })
     fireEvent.change(repsInputs()[0], { target: { value: '10' } })
-    fireEvent.blur(repsInputs()[0])
+    fireEvent.keyDown(repsInputs()[0], { key: 'Enter' })
 
     expect(document.activeElement).toBe(weightInputs()[1])
     // Rest is only authored after the round's second exercise — completing
